@@ -1,0 +1,12 @@
+[submodule "vendor/fuserl"]
+	path = vendor/fuserl
+	url = gitosis@git.scallable.ca:fuserl.git
+[submodule "vendor/rabbitmq-erlang-client"]
+	path = vendor/rabbitmq-erlang-client
+	url = gitosis@git.scallable.ca:rabbitmq-erlang-client.git
+[submodule "vendor/rabbitmq-codegen"]
+	path = vendor/rabbitmq-codegen
+	url = gitosis@git.scallable.ca:rabbitmq-codegen.git
+[submodule "vendor/rabbitmq-server"]
+	path = vendor/rabbitmq-server
+	url = gitosis@git.scallable.ca:rabbitmq-server.git
