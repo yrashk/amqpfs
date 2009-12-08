@@ -10,3 +10,6 @@
 [submodule "vendor/rabbitmq-server"]
 	path = vendor/rabbitmq-server
 	url = gitosis@git.scallable.ca:rabbitmq-server.git
+[submodule "vendor/erabbitmq"]
+	path = vendor/erabbitmq
+	url = gitosis@git.scallable.ca:erabbitmq.git

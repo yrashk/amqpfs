@@ -1,6 +1,9 @@
 all: submodules
 
-submodules: rabbitmq-erlang-client fuserl
+submodules: erabbitmq fuserl
+
+erabbitmq: rabbitmq-erlang-client
+	cd vendor/erabbitmq ; $(MAKE)
 
 rabbitmq-erlang-client: $(dir vendor/rabbitmq-erlang-client)
 	cd vendor/rabbitmq-codegen ; $(MAKE)
