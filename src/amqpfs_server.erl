@@ -48,7 +48,7 @@ terminate (_Reason, _State) -> ok.
 -define (LINKATTR, #stat{ st_mode = ?S_IFLNK bor 8#0555, st_nlink = 1 }).
 
 % / -> 1
-% /AMQPFS -> 2
+% /.amqpfs -> 2
 
 getattr (_, 1, _, State) ->
   { #fuse_reply_attr{ attr = ?DIRATTR (1), attr_timeout_ms = 1000 }, State };
@@ -56,7 +56,7 @@ getattr (_, 2, _, State) ->
   { #fuse_reply_attr{ attr = ?DIRATTR (2), attr_timeout_ms = 1000 }, State }.
 
 
-lookup (_, 1, <<"AMQPFS">>, _, State) ->
+lookup (_, 1, <<".amqpfs">>, _, State) ->
   { #fuse_reply_entry{ 
       fuse_entry_param = #fuse_entry_param{ ino = 6,
                                             generation = 1,  % (?)
@@ -91,7 +91,7 @@ readdir (_, 1, Size, Offset, _Fi, _, State) ->
          (Offset,
           [ #direntry{ name = ".", offset = 1, stat = ?DIRATTR (1) },
             #direntry{ name = "..", offset = 2, stat = ?DIRATTR (1) },
-            #direntry{ name = "AMQPFS", offset = 3, stat = ?DIRATTR(2) }
+            #direntry{ name = ".amqpfs", offset = 3, stat = ?DIRATTR(2) }
           ])),
   { #fuse_reply_direntrylist{ direntrylist = DirEntryList }, State }.
 
