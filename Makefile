@@ -1,4 +1,7 @@
-all: submodules
+all: main
+
+main: submodules
+	erl -make
 
 submodules: erabbitmq fuserl
 
