@@ -17,7 +17,10 @@
 
 -record (amqpfs, { inodes, 
                    names,
-                   amqp_conn, amqp_channel, amqp_ticket, amqp_consumer_tag }).
+                   response_routes,
+                   amqp_conn, amqp_channel, amqp_ticket, amqp_consumer_tag, amqp_response_consumer_tag }).
+
+-define(ON_DEMAND_TIMEOUT, 60000).
 
 %-=====================================================================-
 %-                                Public                               -
@@ -51,14 +54,36 @@ init ([]) ->
                                                                                   passive = false, durable = true,
                                                                                   auto_delete = false, internal = false,
                                                                                   nowait = false, arguments = []}),
-    Queue = list_to_binary("amqpfs.server->" ++ atom_to_list(node())),
+    #'exchange.declare_ok'{} = amqp_channel:call(AmqpChannel, #'exchange.declare'{ticket = Ticket,
+                                                                                  exchange = <<"amqpfs.response">>,
+                                                                                  type = <<"direct">>,
+                                                                                  passive = false, durable = false,
+                                                                                  auto_delete = false, internal = false,
+                                                                                  nowait = false, arguments = []}),
+    #'exchange.declare_ok'{} = amqp_channel:call(AmqpChannel, #'exchange.declare'{ticket = Ticket,
+                                                                                  exchange = <<"amqpfs">>,
+                                                                                  type = <<"fanout">>,
+                                                                                  passive = false, durable = false,
+                                                                                  auto_delete = false, internal = false,
+                                                                                  nowait = false, arguments = []}),
+    Queue = list_to_binary("amqpfs.announce@" ++ atom_to_list(node())),
+    ResponseQueue = list_to_binary("amqpfs.response@" ++ atom_to_list(node())),
     #'queue.declare_ok'{} = amqp_channel:call(AmqpChannel, #'queue.declare'{ticket = Ticket,
                                                                             queue = Queue,
                                                                             passive = false, durable = true,
                                                                             exclusive = false, auto_delete = false,
                                                                             nowait = false, arguments = []}),
+    #'queue.declare_ok'{} = amqp_channel:call(AmqpChannel, #'queue.declare'{ticket = Ticket,
+                                                                            queue = ResponseQueue,
+                                                                            passive = false, durable = false,
+                                                                            exclusive = false, auto_delete = false,
+                                                                            nowait = false, arguments = []}),
     #'queue.bind_ok'{} = amqp_channel:call(AmqpChannel, #'queue.bind'{ticket = Ticket,
                                                                       queue = Queue, exchange = <<"amqpfs.announce">>,
+                                                                      routing_key = <<"">>,
+                                                                      nowait = false, arguments = []}),
+    #'queue.bind_ok'{} = amqp_channel:call(AmqpChannel, #'queue.bind'{ticket = Ticket,
+                                                                      queue = ResponseQueue, exchange = <<"amqpfs.response">>,
                                                                       routing_key = <<"">>,
                                                                       nowait = false, arguments = []}),
     #'basic.consume_ok'{consumer_tag = ConsumerTag} = amqp_channel:subscribe(AmqpChannel, #'basic.consume'{ticket = Ticket,
@@ -71,12 +96,25 @@ init ([]) ->
     receive
           #'basic.consume_ok'{consumer_tag = ConsumerTag} -> ok
     end,
+    #'basic.consume_ok'{consumer_tag = ResponseConsumerTag} = amqp_channel:subscribe(AmqpChannel, #'basic.consume'{ticket = Ticket,
+                                                                                                                   queue = ResponseQueue,
+                                                                                                                   consumer_tag = <<"">>,
+                                                                                                                   no_local = false,
+                                                                                                                   no_ack = true,
+                                                                                                                   exclusive = false,
+                                                                                                                   nowait = false}, self()),
+    receive
+          #'basic.consume_ok'{consumer_tag = ResponseConsumerTag} -> ok
+    end,
+
     State0 = #amqpfs{ inodes = ets:new(inodes, [public, ordered_set]),
                       names = ets:new(names, [public, set]),
+                      response_routes = ets:new(response_routes, [public, set]),
                       amqp_conn = AmqpConn,
                       amqp_channel = AmqpChannel,
                       amqp_ticket = Ticket,
-                      amqp_consumer_tag = ConsumerTag
+                      amqp_consumer_tag = ConsumerTag,
+                      amqp_response_consumer_tag = ResponseConsumerTag
                   },
     State = lists:foldl(fun (D, StateAcc) -> 
                                 case D of
@@ -104,7 +142,23 @@ init ([]) ->
 
 code_change (_OldVsn, State, _Extra) -> { ok, State }.
 
-handle_info({#'basic.deliver'{consumer_tag=_ConsumerTag, delivery_tag=_DeliveryTag, redelivered=_Redelivered, exchange = <<"amqpfs.announce">>, routing_key=RoutingKey}, Content} , #amqpfs{amqp_consumer_tag = ConsumerTag}=State) ->
+handle_info({#'basic.deliver'{consumer_tag=ConsumerTag, delivery_tag=_DeliveryTag, redelivered=_Redelivered, exchange = <<"amqpfs.response">>, routing_key=RoutingKey}, Content} , #amqpfs{response_routes = Tab, amqp_response_consumer_tag = ConsumerTag}=State) ->
+    #amqp_msg{payload = Payload } = Content,
+    #'P_basic'{content_type = ContentType, headers = Headers, reply_to = Route} = Content#amqp_msg.props,
+    Response =
+    case ContentType of
+        _ ->
+            binary_to_term(Payload)
+    end,
+    case ets:lookup(Tab, Route) of 
+        [{Route, Pid}] ->
+            Pid ! {response, Response};
+        _ ->
+            discard
+    end,
+    {noreply, State};
+    
+handle_info({#'basic.deliver'{consumer_tag=ConsumerTag, delivery_tag=_DeliveryTag, redelivered=_Redelivered, exchange = <<"amqpfs.announce">>, routing_key=RoutingKey}, Content} , #amqpfs{amqp_consumer_tag = ConsumerTag}=State) ->
     #amqp_msg{payload = Payload } = Content,
     #'P_basic'{content_type = ContentType, headers = Headers} = Content#amqp_msg.props,
     Command =
@@ -124,7 +178,7 @@ terminate (_Reason, _State) -> ok.
 
 
 handle_command({announce, directory, {Path, Contents}}, State) ->
-    {_, State1} = ensure_path(Path, State),
+    {_, State1} = ensure_path(Path, {directory, Contents}, State),
     {_, State2} = make_inode(Path, {directory, Contents}, State1),
     State2;
 
@@ -216,7 +270,7 @@ readdir(Ctx, Ino, Size, Offset, Fi, Cont, State) ->
                end),
     { noreply, State }.
 
-readdir_async(Ctx, Ino, Size, Offset, Fi, Cont, State) ->
+readdir_async(Ctx, Ino, Size, Offset, Fi, Cont, #amqpfs{amqp_ticket=Ticket, amqp_channel=Channel}=State) ->
     {Contents, _} =
         case ets:lookup(State#amqpfs.inodes, Ino) of
             [{Ino,Path}] ->
@@ -225,7 +279,32 @@ readdir_async(Ctx, Ino, Size, Offset, Fi, Cont, State) ->
                             _ -> Path
                         end,
                 case ets:lookup(State#amqpfs.names, Path) of
-                    [{Path, { Ino, {directory, List } }}] ->
+                    [{Path, { Ino, {directory, on_demand}}}] ->
+                        Route = register_response_route(State),
+                        amqp_channel:call(Channel, #'basic.publish'{ticket=Ticket, exchange= <<"amqpfs">>}, {amqp_msg, #'P_basic'{message_id = Route}, term_to_binary({list, directory, Path})}),
+                        Response = 
+                            receive 
+                                {response, Data} -> Data
+                            after ?ON_DEMAND_TIMEOUT ->
+                                    []
+                            end,
+                        unregister_response_route(Route, State),
+                        lists:foldl(fun (P, {L, Acc}) -> % it is a copy paste of the stuff below
+                                            Path2 = Path1 ++ "/" ++ P,
+                                            case ets:lookup(State#amqpfs.names, Path2) of                      
+                                                [{Path2, {ChildIno, {directory, _Extra}}}] ->
+                                                    {L ++ [#direntry{ name = P, offset = Acc, stat = ?DIRATTR(ChildIno)}], Acc + 1};
+                                                [{Path2, {ChildIno, {file, _}}}] ->
+                                                    {L ++ [#direntry{ name = P, offset = Acc, stat = 
+                                                                      #stat{ st_ino = ChildIno, 
+                                                                             st_mode = ?S_IFREG bor 8#0444, 
+                                                                             st_size = 0 }
+                                                                     }], Acc + 1};
+                                                _ ->
+                                                    {L, Acc}
+                                            end
+                                    end, {[],3},  Response);
+                    [{Path, { Ino, {directory, List } }}] when is_list(List) ->
                         lists:foldl(fun (P, {L, Acc}) ->
                                             Path2 = Path1 ++ "/" ++ P,
                                             case ets:lookup(State#amqpfs.names, Path2) of                      
@@ -299,9 +378,12 @@ make_inode (Name,Extra, State) ->
 ensure_path("/", State) ->
     make_inode("/", undefined, State);
 ensure_path(Path, State0) ->
+    ensure_path(Path, {directory, []}, State0).
+
+ensure_path(Path, Extra, State0) ->
     Dir = filename:dirname(Path),
     Base = filename:basename(Path),
-    {_, State1} = make_inode(Path, {directory, []}, State0),
+    {_, State1} = make_inode(Path, Extra, State0),
     {Ino, State2} = ensure_path(Dir, State1),
     State3 = add_item(Dir, Base, State2),
     {Ino, State3}.
@@ -320,7 +402,13 @@ add_item(Path, Item, State) ->
     end,
     State.
 
-    
+register_response_route(#amqpfs{response_routes=Tab}=State) ->
+    Route = list_to_binary(lists:flatten(io_lib:format("~w",[now()]))),
+    ets:insert(Tab, {Route, self()}),
+    Route.
+
+unregister_response_route(Route, #amqpfs{response_routes=Tab}=State) ->
+    ets:delete(Tab, Route).
             
         
     
