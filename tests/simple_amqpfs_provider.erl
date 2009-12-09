@@ -50,9 +50,11 @@ start() ->
     receive
           #'basic.consume_ok'{consumer_tag = ConsumerTag} -> ok
     end,
-    amqp_channel:call(AmqpChannel, #'basic.publish'{ticket=Ticket, exchange= <<"amqpfs.announce">>}, {amqp_msg, #'P_basic'{}, term_to_binary({announce, directory, {"/simple",[]}})}),
-    amqp_channel:call(AmqpChannel, #'basic.publish'{ticket=Ticket, exchange= <<"amqpfs.announce">>}, {amqp_msg, #'P_basic'{}, term_to_binary({announce, directory, {"/simple_on_demand",on_demand}})}),
-    amqp_channel:call(AmqpChannel, #'basic.publish'{ticket=Ticket, exchange= <<"amqpfs.announce">>}, {amqp_msg, #'P_basic'{}, term_to_binary({announce, file, {"/just_a_file",undefined}})}),
+    amqpfs_announce:directory(AmqpChannel, Ticket, "/simple",[]),
+    amqpfs_announce:directory(AmqpChannel, Ticket, "/simple_on_demand"),
+    amqpfs_announce:file(AmqpChannel, Ticket, "/just_a_file"),
+    amqpfs_announce:file(AmqpChannel, Ticket, "/simple/anotherfile"),
+    amqpfs_announce:file(AmqpChannel, Ticket, "/simple/anotherfile1"),
     loop(AmqpChannel, Ticket).
 
 loop(AmqpChannel, Ticket) ->
