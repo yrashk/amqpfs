@@ -7,5 +7,5 @@
           amqpfs, amqpfs_sup, amqpfs_server
            ]},
 {registered, [amqpfs_server]},
-{applications, [kernel, stdlib]}
+{applications, [kernel, stdlib, erabbitmq]}
 ]}.
