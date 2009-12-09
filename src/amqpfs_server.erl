@@ -62,7 +62,7 @@ init ([]) ->
                                                                                   nowait = false, arguments = []}),
     #'exchange.declare_ok'{} = amqp_channel:call(AmqpChannel, #'exchange.declare'{ticket = Ticket,
                                                                                   exchange = <<"amqpfs">>,
-                                                                                  type = <<"fanout">>,
+                                                                                  type = <<"topic">>,
                                                                                   passive = false, durable = false,
                                                                                   auto_delete = false, internal = false,
                                                                                   nowait = false, arguments = []}),
@@ -450,7 +450,7 @@ unregister_response_route(Route, #amqpfs{response_routes=Tab}=State) ->
             
 directory_on_demand(Path, #amqpfs{amqp_ticket = Ticket, amqp_channel = Channel}=State) ->
     Route = register_response_route(State),
-    amqp_channel:call(Channel, #'basic.publish'{ticket=Ticket, exchange= <<"amqpfs">>}, {amqp_msg, #'P_basic'{message_id = Route}, term_to_binary({list, directory, Path})}),
+    amqp_channel:call(Channel, #'basic.publish'{ticket=Ticket, exchange= <<"amqpfs">>, routing_key = amqpfs_util:path_to_routing_key(Path)}, {amqp_msg, #'P_basic'{message_id = Route}, term_to_binary({list, directory, Path})}),
     Response = 
         receive 
             {response, Data} -> Data
