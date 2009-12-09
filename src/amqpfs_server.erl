@@ -251,28 +251,7 @@ readdir (_, Ino, Size, Offset, _Fi, _, State) ->
           [ #direntry{ name = ".", offset = 1, stat = ?DIRATTR (Ino) },
             #direntry{ name = "..", offset = 2, stat = ?DIRATTR (Ino) }
            ] ++ Contents)),
-    { #fuse_reply_direntrylist{ direntrylist = DirEntryList }, State };
-
-
-readdir (_, 2, Size, Offset, _Fi, _, State) ->
-  DirEntryList = 
-    take_while 
-      (fun (E, { Total, Max }) -> 
-         Cur = fuserlsrv:dirent_size (E),
-         if 
-           Total + Cur =< Max ->
-             { continue, { Total + Cur, Max } };
-           true ->
-             stop
-         end
-       end,
-       { 0, Size },
-       lists:nthtail 
-         (Offset,
-          [ #direntry{ name = ".", offset = 1, stat = ?DIRATTR (1) },
-            #direntry{ name = "..", offset = 2, stat = ?DIRATTR (1) }
-          ])),
-  { #fuse_reply_direntrylist{ direntrylist = DirEntryList }, State }.
+    { #fuse_reply_direntrylist{ direntrylist = DirEntryList }, State }.
 
 readlink (_, X, _, State) ->
     { #fuse_reply_err{ err = einval }, State }.
