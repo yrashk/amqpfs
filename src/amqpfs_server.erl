@@ -72,7 +72,7 @@ init ([]) ->
           #'basic.consume_ok'{consumer_tag = ConsumerTag} -> ok
     end,
     State0 = #amqpfs{ inodes = ets:new(inodes, [public, ordered_set]),
-                      names = gb_trees:empty(),
+                      names = ets:new(names, [public, set]),
                       amqp_conn = AmqpConn,
                       amqp_channel = AmqpChannel,
                       amqp_ticket = Ticket,
@@ -140,10 +140,10 @@ handle_command({cancel, file, Path}, State) ->
 getattr (_, Ino, _, State) ->
     case ets:lookup(State#amqpfs.inodes, Ino) of
         [{Ino, Path}] ->
-            case gb_trees:lookup(Path, State#amqpfs.names) of
-                { value, { Ino, {directory, _List} } } ->
+            case ets:lookup(State#amqpfs.names, Path) of
+                [{Path, { Ino, {directory, _List} } }] ->
                             { #fuse_reply_attr{ attr = ?DIRATTR (Ino), attr_timeout_ms = 1000 }, State };
-                { value, { Ino, {file, _} } } ->
+                [{Path, { Ino, {file, _} } }] ->
                     { #fuse_reply_attr{ attr =    #stat{ st_ino = Ino, 
                                                          st_mode = ?S_IFREG bor 8#0444, 
                                                          st_size = 0 }, attr_timeout_ms = 1000 }, State };
@@ -162,12 +162,13 @@ lookup (_, ParentIno, BinPath, _, State) ->
                         "/" -> "";
                         _ -> Path
                     end,
-            case gb_trees:lookup(Path, State#amqpfs.names) of
-                { value, { ParentIno, {directory, List} } } ->
+            case ets:lookup(State#amqpfs.names, Path) of
+                [{Path, { ParentIno, {directory, List} } }] ->
                     case lists:any(fun (P) -> P == BinPath end,  lists:map(fun erlang:list_to_binary/1, List)) of
                         true -> % there is something
-                            case gb_trees:lookup(Path1 ++ "/" ++ binary_to_list(BinPath), State#amqpfs.names) of
-                                {value, {Ino, {directory, _List}}} ->
+                            Path2 = Path1 ++ "/" ++ binary_to_list(BinPath),
+                            case ets:lookup(State#amqpfs.names, Path2) of
+                                [{Path2, {Ino, {directory, _List}}}] ->
                                     {#fuse_reply_entry{ 
                                           fuse_entry_param = #fuse_entry_param{ ino = Ino,
                                                                                 generation = 1,  % (?)
@@ -175,7 +176,7 @@ lookup (_, ParentIno, BinPath, _, State) ->
                                                                                 entry_timeout_ms = 1000,
                                                                                 attr = ?DIRATTR (Ino) } },
                                      State};
-                                {value, {Ino, {file, _}}} ->
+                                [{Path2, {Ino, {file, _}}}] ->
                                     {#fuse_reply_entry{ 
                                           fuse_entry_param = #fuse_entry_param{ ino = Ino,
                                                                                 generation = 1,  % (?)
@@ -223,13 +224,14 @@ readdir_async(Ctx, Ino, Size, Offset, Fi, Cont, State) ->
                             "/" -> "";
                             _ -> Path
                         end,
-                case gb_trees:lookup(Path, State#amqpfs.names) of
-                    { value, { Ino, {directory, List } }} ->
+                case ets:lookup(State#amqpfs.names, Path) of
+                    [{Path, { Ino, {directory, List } }}] ->
                         lists:foldl(fun (P, {L, Acc}) ->
-                                            case gb_trees:lookup(Path1 ++ "/" ++ P, State#amqpfs.names) of                      
-                                                {value, {ChildIno, {directory, _Extra}}} ->
+                                            Path2 = Path1 ++ "/" ++ P,
+                                            case ets:lookup(State#amqpfs.names, Path2) of                      
+                                                [{Path2, {ChildIno, {directory, _Extra}}}] ->
                                                     {L ++ [#direntry{ name = P, offset = Acc, stat = ?DIRATTR(ChildIno)}], Acc + 1};
-                                                {value, {ChildIno, {file, _}}} ->
+                                                [{Path2, {ChildIno, {file, _}}}] ->
                                                     {L ++ [#direntry{ name = P, offset = Acc, stat = 
                                                                       #stat{ st_ino = ChildIno, 
                                                                              st_mode = ?S_IFREG bor 8#0444, 
@@ -279,10 +281,10 @@ take_while (F, Acc, [ H | T ]) ->
    end.
 
 make_inode (Name,Extra, State) ->
-  case gb_trees:lookup (Name, State#amqpfs.names) of
-      { value, { Ino, _ } } ->
+  case ets:lookup (State#amqpfs.names, Name) of
+      [{Name, { Ino, _ } }] ->
           { Ino, State };
-      none ->
+      [] ->
           Inodes = State#amqpfs.inodes,
           Max =
               case ets:last(Inodes) of
@@ -290,9 +292,8 @@ make_inode (Name,Extra, State) ->
                   N -> N
               end,
           ets:insert(Inodes, {Max + 1, Name}),
-          Names = State#amqpfs.names,
-          NewNames = gb_trees:insert (Name, { Max + 1, Extra }, Names),
-          { Max + 1, State#amqpfs{ names = NewNames } }
+          ets:insert (State#amqpfs.names, {Name, {Max + 1, Extra}}),
+          { Max + 1, State }
   end.
 
 ensure_path("/", State) ->
@@ -306,19 +307,18 @@ ensure_path(Path, State0) ->
     {Ino, State3}.
 
 add_item(Path, Item, State) ->    
-    NewNames =
-        case gb_trees:lookup (Path, State#amqpfs.names) of
-            {value, {Ino, {directory, List}}} ->
+        case ets:lookup(State#amqpfs.names, Path) of
+            [{Path, {Ino, {directory, List}}}] ->
                 case lists:any(fun (I) -> I == Item end, List) of
                     false ->
-                        gb_trees:update(Path, {Ino, {directory, List ++ [Item]}}, State#amqpfs.names);
+                        ets:insert(State#amqpfs.names, {Path, {Ino, {directory, List ++ [Item]}}});
                     _ ->
-                        State#amqpfs.names
+                        skip
                 end;
         _ ->
-            State#amqpfs.names
+            skip
     end,
-    State#amqpfs{ names = NewNames }.
+    State.
 
     
             
