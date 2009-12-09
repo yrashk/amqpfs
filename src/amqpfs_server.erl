@@ -182,8 +182,10 @@ handle_command({announce, directory, {Path, Contents}}, State) ->
     {_, State2} = make_inode(Path, {directory, Contents}, State1),
     State2;
 
-handle_command({announce, file, Path}, State) ->
-    State;
+handle_command({announce, file, {Path, Extra}}, State) ->
+    {_, State2} = make_inode(Path, {file, Extra}, State),
+    State3 = add_item(filename:dirname(Path),filename:basename(Path), State2),
+    State3;
 
 handle_command({cancel, directory, Path}, State) ->
     State;

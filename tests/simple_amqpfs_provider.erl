@@ -52,6 +52,7 @@ start() ->
     end,
     amqp_channel:call(AmqpChannel, #'basic.publish'{ticket=Ticket, exchange= <<"amqpfs.announce">>}, {amqp_msg, #'P_basic'{}, term_to_binary({announce, directory, {"/simple",[]}})}),
     amqp_channel:call(AmqpChannel, #'basic.publish'{ticket=Ticket, exchange= <<"amqpfs.announce">>}, {amqp_msg, #'P_basic'{}, term_to_binary({announce, directory, {"/simple_on_demand",on_demand}})}),
+    amqp_channel:call(AmqpChannel, #'basic.publish'{ticket=Ticket, exchange= <<"amqpfs.announce">>}, {amqp_msg, #'P_basic'{}, term_to_binary({announce, file, {"/just_a_file",undefined}})}),
     loop(AmqpChannel, Ticket).
 
 loop(AmqpChannel, Ticket) ->
