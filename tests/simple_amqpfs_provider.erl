@@ -67,7 +67,7 @@ loop(AmqpChannel, Ticket) ->
             case Command of
                 {list, directory, Path} ->
                     io:format("list directory ~s for ~p ~n",[Path, MessageId]),
-                    amqp_channel:call(AmqpChannel, #'basic.publish'{ticket=Ticket, exchange= <<"amqpfs.response">>}, {amqp_msg, #'P_basic'{reply_to = MessageId}, term_to_binary([])});
+                    amqp_channel:call(AmqpChannel, #'basic.publish'{ticket=Ticket, exchange= <<"amqpfs.response">>}, {amqp_msg, #'P_basic'{reply_to = MessageId}, term_to_binary([{"bogus",{file, undefined}}])});
                 Other ->
                     io:format("Unknown request ~p~n",[Other])
             end;
