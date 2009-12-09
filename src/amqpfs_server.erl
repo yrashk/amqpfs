@@ -97,8 +97,9 @@ init ([]) ->
                                 end
                         end, State0, 
                         [{"/", {directory, [".amqpfs"]}},
-                         {"/.amqpfs", {directory, ["version"]}},
-                         {"/.amqpfs/version", {file, undefined}}
+                         {"/.amqpfs", {directory, ["version","server"]}},
+                         {"/.amqpfs/version", {file, undefined}},
+                         {"/.amqpfs/server", {file, undefined}}
                         ]),
     { ok, State }.
 
