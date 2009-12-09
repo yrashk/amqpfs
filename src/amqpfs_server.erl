@@ -289,7 +289,6 @@ lookup_async(Ctx, ParentIno, BinPath, Cont, State) ->
                     end;                    
             
                 _ ->
-                    io:format("!!!!!!!!~p~n",[Path]),
                     #fuse_reply_err{ err = enoent }
             end,
             fuserlsrv:reply (Cont, Result);
