@@ -90,11 +90,15 @@ init ([]) ->
                                                 {_, StateAcc1} = ensure_path(filename:dirname(Path), StateAcc),
                                                 {_, StateAcc2} = make_inode(Path, {directory, Contents}, StateAcc1),
                                                 StateAcc2
-                                        end
+                                        end;
+                                    {Path, {file, X}} ->
+                                        {_, StateAcc1} = make_inode(Path, {file, X}, StateAcc),
+                                        StateAcc1
                                 end
                         end, State0, 
-                        [{"/", {directory, [".amqpfs","crueljoke"]}},
-                         {"/.amqpfs", {directory, []}}
+                        [{"/", {directory, [".amqpfs"]}},
+                         {"/.amqpfs", {directory, ["version"]}},
+                         {"/.amqpfs/version", {file, undefined}}
                         ]),
     { ok, State }.
 
@@ -137,20 +141,18 @@ getattr (_, Ino, _, State) ->
     case gb_trees:lookup(Ino, State#amqpfs.inodes) of
         {value, Path} ->
             case gb_trees:lookup(Path, State#amqpfs.names) of
-                { value, { Ino, Extra } } ->
-                    case Extra of
-                        {directory, _List} ->
+                { value, { Ino, {directory, _List} } } ->
                             { #fuse_reply_attr{ attr = ?DIRATTR (Ino), attr_timeout_ms = 1000 }, State };
-                        _ ->
-                      { #fuse_reply_err{ err = einval }, State }
-                    end;
+                { value, { Ino, {file, _} } } ->
+                    { #fuse_reply_attr{ attr =    #stat{ st_ino = Ino, 
+                                                         st_mode = ?S_IFREG bor 8#0444, 
+                                                         st_size = 0 }, attr_timeout_ms = 1000 }, State };
                 _ ->
                     { #fuse_reply_err{ err = enoent }, State }
             end;
         _ ->
             { #fuse_reply_err{ err = enoent }, State }
     end.
-
 
 
 lookup (_, ParentIno, BinPath, _, State) ->
@@ -161,31 +163,36 @@ lookup (_, ParentIno, BinPath, _, State) ->
                         _ -> Path
                     end,
             case gb_trees:lookup(Path, State#amqpfs.names) of
-                { value, { ParentIno, Extra } } ->
-                    case Extra of
-                        {directory, List} ->
-                            case lists:any(fun (P) -> P == BinPath end,  lists:map(fun erlang:list_to_binary/1, List)) of
-                                true -> % there is something
-                                    case gb_trees:lookup(Path1 ++ "/" ++ binary_to_list(BinPath), State#amqpfs.names) of
-                                        {value, {Ino, {directory, _List}}} ->
-                                            {#fuse_reply_entry{ 
+                { value, { ParentIno, {directory, List} } } ->
+                    case lists:any(fun (P) -> P == BinPath end,  lists:map(fun erlang:list_to_binary/1, List)) of
+                        true -> % there is something
+                            case gb_trees:lookup(Path1 ++ "/" ++ binary_to_list(BinPath), State#amqpfs.names) of
+                                {value, {Ino, {directory, _List}}} ->
+                                    {#fuse_reply_entry{ 
                                           fuse_entry_param = #fuse_entry_param{ ino = Ino,
                                                                                 generation = 1,  % (?)
                                                                                 attr_timeout_ms = 1000,
                                                                                 entry_timeout_ms = 1000,
                                                                                 attr = ?DIRATTR (Ino) } },
-                                             State};
-                                        _ ->
-                                            { #fuse_reply_err{ err = enoent }, State }
-                                    end;
-                                false ->
+                                     State};
+                                {value, {Ino, {file, _}}} ->
+                                    {#fuse_reply_entry{ 
+                                          fuse_entry_param = #fuse_entry_param{ ino = Ino,
+                                                                                generation = 1,  % (?)
+                                                                                attr_timeout_ms = 1000,
+                                                                                entry_timeout_ms = 1000,
+                                                                                attr = #stat{ st_ino = Ino, 
+                                                                                              st_mode = ?S_IFREG bor 8#0444, 
+                                                                                              st_size = 0 } } },
+                                     State};
+                                _ ->
                                     { #fuse_reply_err{ err = enoent }, State }
                             end;
-                        _ ->
-                            { #fuse_reply_err{ err = einval }, State }
+                        false ->
+                            { #fuse_reply_err{ err = enoent }, State }
                     end;
                 _ ->
-                    { #fuse_reply_err{ err = enoent }, State }
+                    { #fuse_reply_err{ err = einval }, State }
             end;
         _ ->
             { #fuse_reply_err{ err = enoent }, State }
@@ -215,6 +222,12 @@ readdir (_, Ino, Size, Offset, _Fi, _, State) ->
                                         case gb_trees:lookup(Path1 ++ "/" ++ P, State#amqpfs.names) of                      
                                             {value, {ChildIno, {directory, _Extra}}} ->
                                                 {L ++ [#direntry{ name = P, offset = Acc, stat = ?DIRATTR(ChildIno)}], Acc + 1};
+                                            {value, {ChildIno, {file, _}}} ->
+                                                {L ++ [#direntry{ name = P, offset = Acc, stat = 
+                                                                   #stat{ st_ino = ChildIno, 
+                                                                          st_mode = ?S_IFREG bor 8#0444, 
+                                                                          st_size = 0 }
+                                                                 }], Acc + 1};
                                             _ ->
                                                 {L, Acc}
                                         end
