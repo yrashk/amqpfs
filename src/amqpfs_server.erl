@@ -59,7 +59,7 @@ init ([]) ->
                                                                             nowait = false, arguments = []}),
     #'queue.bind_ok'{} = amqp_channel:call(AmqpChannel, #'queue.bind'{ticket = Ticket,
                                                                       queue = Queue, exchange = <<"amqpfs.announce">>,
-                                                                      routing_key = <<"#">>,
+                                                                      routing_key = <<"">>,
                                                                       nowait = false, arguments = []}),
     #'basic.consume_ok'{consumer_tag = ConsumerTag} = amqp_channel:subscribe(AmqpChannel, #'basic.consume'{ticket = Ticket,
                                                                                                            queue = Queue,
@@ -67,8 +67,7 @@ init ([]) ->
                                                                                                            no_local = false,
                                                                                                            no_ack = true,
                                                                                                            exclusive = false,
-                                                                                                           nowait = false},
-                                                                             self()),
+                                                                                                           nowait = false}, self()),
     receive
           #'basic.consume_ok'{consumer_tag = ConsumerTag} -> ok
     end,
@@ -105,15 +104,13 @@ init ([]) ->
 
 code_change (_OldVsn, State, _Extra) -> { ok, State }.
 
-handle_info({#'basic.deliver'{consumer_tag=ConsumerTag, delivery_tag=_DeliveryTag, redelivered=_Redelivered, exchange = <<"amqpfs.announce">>, routing_key=RoutingKey}, Content} , #amqpfs{amqp_consumer_tag = ConsumerTag}=State) ->
-    #content{payload_fragments_rev = Payload, properties_bin = PropertiesBin, class_id = ClassId} = Content,
-    #'P_basic'{content_type = ContentType, headers = Headers} = rabbit_framing:decode_properties(ClassId, PropertiesBin),
+handle_info({#'basic.deliver'{consumer_tag=_ConsumerTag, delivery_tag=_DeliveryTag, redelivered=_Redelivered, exchange = <<"amqpfs.announce">>, routing_key=RoutingKey}, Content} , #amqpfs{amqp_consumer_tag = ConsumerTag}=State) ->
+    #amqp_msg{payload = Payload } = Content,
+    #'P_basic'{content_type = ContentType, headers = Headers} = Content#amqp_msg.props,
     Command =
     case ContentType of
-        <<"application/x-bert">> ->
-            binary_to_term(Payload);
         _ ->
-            error
+            binary_to_term(Payload)
     end,
     {noreply, handle_command(Command, State)};
 
@@ -126,8 +123,10 @@ terminate (_Reason, _State) -> ok.
 -define (LINKATTR, #stat{ st_mode = ?S_IFLNK bor 8#0555, st_nlink = 1 }).
 
 
-handle_command({announce, directory, Path}, State) ->
-    State;
+handle_command({announce, directory, {Path, Contents}}, State) ->
+    {_, State1} = ensure_path(Path, State),
+    {_, State2} = make_inode(Path, {directory, Contents}, State1),
+    State2;
 
 handle_command({announce, file, Path}, State) ->
     State;
@@ -197,11 +196,7 @@ lookup (_, ParentIno, BinPath, _, State) ->
             end;
         _ ->
             { #fuse_reply_err{ err = enoent }, State }
-    end;
-
-
-lookup (_, _, _, _, State) ->
-      { #fuse_reply_err{ err = enoent }, State }.
+    end.
 
 open (_, X, Fi = #fuse_file_info{}, _, State) when X >= 1, X =< 6 ->
       { #fuse_reply_err{ err = eacces }, State }.
@@ -293,11 +288,9 @@ take_while (F, Acc, [ H | T ]) ->
        []
    end.
 
-make_inode (Name, Extra, State) ->
+make_inode (Name,Extra, State) ->
   case gb_trees:lookup (Name, State#amqpfs.names) of
-      { value, { Ino, Extra } } ->
-          { Ino, State };
-      {value, { Ino, _ } } ->
+      { value, { Ino, _ } } ->
           { Ino, State };
       none ->
           Inodes = State#amqpfs.inodes,
@@ -312,5 +305,29 @@ ensure_path("/", State) ->
     make_inode("/", undefined, State);
 ensure_path(Path, State0) ->
     Dir = filename:dirname(Path),
-    State1 = make_inode(Path, {diretory, []}, State0),
-    make_inode(Dir, {directory, [Path]}, State1).
+    Base = filename:basename(Path),
+    {_, State1} = make_inode(Path, {directory, []}, State0),
+    {Ino, State2} = ensure_path(Dir, State1),
+    State3 = add_item(Dir, Base, State2),
+    {Ino, State3}.
+
+add_item(Path, Item, State) ->    
+    NewNames =
+        case gb_trees:lookup (Path, State#amqpfs.names) of
+            {value, {Ino, {directory, List}}} ->
+                case lists:any(fun (I) -> I == Item end, List) of
+                    false ->
+                        gb_trees:update(Path, {Ino, {directory, List ++ [Item]}}, State#amqpfs.names);
+                    _ ->
+                        State#amqpfs.names
+                end;
+        _ ->
+            State#amqpfs.names
+    end,
+    State#amqpfs{ names = NewNames }.
+
+    
+            
+        
+    
+    
