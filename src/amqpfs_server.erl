@@ -204,36 +204,47 @@ open (_, X, Fi = #fuse_file_info{}, _, State) when X >= 1, X =< 6 ->
 read (_, X, Size, Offset, _Fi, _, State) ->
     { #fuse_reply_err{ err = einval }, State }.
 
-readdir (_, Ino, Size, Offset, _Fi, _, State) ->
+readdir(Ctx, Ino, Size, Offset, Fi, Cont, State) ->
+    spawn_link(fun () -> readdir_async (Ctx,
+                                        Ino,
+                                        Size,
+                                        Offset,
+                                        Fi,
+                                        Cont,
+                                        State)
+               end),
+    { noreply, State }.
+
+readdir_async(Ctx, Ino, Size, Offset, Fi, Cont, State) ->
     {Contents, _} =
-    case gb_trees:lookup(Ino, State#amqpfs.inodes) of
-        {value, Path} ->
-            Path1 = case Path of
-                        "/" -> "";
-                        _ -> Path
-                    end,
-            case gb_trees:lookup(Path, State#amqpfs.names) of
-                { value, { Ino, {directory, List } }} ->
-                    lists:foldl(fun (P, {L, Acc}) ->
-                                        case gb_trees:lookup(Path1 ++ "/" ++ P, State#amqpfs.names) of                      
-                                            {value, {ChildIno, {directory, _Extra}}} ->
-                                                {L ++ [#direntry{ name = P, offset = Acc, stat = ?DIRATTR(ChildIno)}], Acc + 1};
-                                            {value, {ChildIno, {file, _}}} ->
-                                                {L ++ [#direntry{ name = P, offset = Acc, stat = 
-                                                                   #stat{ st_ino = ChildIno, 
-                                                                          st_mode = ?S_IFREG bor 8#0444, 
-                                                                          st_size = 0 }
-                                                                 }], Acc + 1};
-                                            _ ->
-                                                {L, Acc}
-                                        end
-                                end, {[],3},  List);
-                _ ->
-                    {[], 3}
-            end;
-        _ ->
-            {[], 3}
-    end,
+        case gb_trees:lookup(Ino, State#amqpfs.inodes) of
+            {value, Path} ->
+                Path1 = case Path of
+                            "/" -> "";
+                            _ -> Path
+                        end,
+                case gb_trees:lookup(Path, State#amqpfs.names) of
+                    { value, { Ino, {directory, List } }} ->
+                        lists:foldl(fun (P, {L, Acc}) ->
+                                            case gb_trees:lookup(Path1 ++ "/" ++ P, State#amqpfs.names) of                      
+                                                {value, {ChildIno, {directory, _Extra}}} ->
+                                                    {L ++ [#direntry{ name = P, offset = Acc, stat = ?DIRATTR(ChildIno)}], Acc + 1};
+                                                {value, {ChildIno, {file, _}}} ->
+                                                    {L ++ [#direntry{ name = P, offset = Acc, stat = 
+                                                                      #stat{ st_ino = ChildIno, 
+                                                                             st_mode = ?S_IFREG bor 8#0444, 
+                                                                             st_size = 0 }
+                                                                     }], Acc + 1};
+                                                _ ->
+                                                    {L, Acc}
+                                            end
+                                    end, {[],3},  List);
+                    _ ->
+                        {[], 3}
+                end;
+            _ ->
+                {[], 3}
+        end,
     DirEntryList = 
         take_while 
           (fun (E, { Total, Max }) -> 
@@ -242,16 +253,16 @@ readdir (_, Ino, Size, Offset, _Fi, _, State) ->
                        Total + Cur =< Max ->
                            { continue, { Total + Cur, Max } };
                        true ->
-             stop
+                           stop
                    end
            end,
            { 0, Size },
-       lists:nthtail 
+           lists:nthtail 
            (Offset,
-          [ #direntry{ name = ".", offset = 1, stat = ?DIRATTR (Ino) },
-            #direntry{ name = "..", offset = 2, stat = ?DIRATTR (Ino) }
-           ] ++ Contents)),
-    { #fuse_reply_direntrylist{ direntrylist = DirEntryList }, State }.
+            [ #direntry{ name = ".", offset = 1, stat = ?DIRATTR (Ino) },
+              #direntry{ name = "..", offset = 2, stat = ?DIRATTR (Ino) }
+             ] ++ Contents)),
+    fuserlsrv:reply (Cont, #fuse_reply_direntrylist{ direntrylist = DirEntryList }).
 
 readlink (_, X, _, State) ->
     { #fuse_reply_err{ err = einval }, State }.
