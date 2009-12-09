@@ -71,7 +71,7 @@ init ([]) ->
     receive
           #'basic.consume_ok'{consumer_tag = ConsumerTag} -> ok
     end,
-    State0 = #amqpfs{ inodes = gb_trees:from_orddict([{ 0, [] }]),
+    State0 = #amqpfs{ inodes = ets:new(inodes, [public, ordered_set]),
                       names = gb_trees:empty(),
                       amqp_conn = AmqpConn,
                       amqp_channel = AmqpChannel,
@@ -138,8 +138,8 @@ handle_command({cancel, file, Path}, State) ->
     State.
 
 getattr (_, Ino, _, State) ->
-    case gb_trees:lookup(Ino, State#amqpfs.inodes) of
-        {value, Path} ->
+    case ets:lookup(State#amqpfs.inodes, Ino) of
+        [{Ino, Path}] ->
             case gb_trees:lookup(Path, State#amqpfs.names) of
                 { value, { Ino, {directory, _List} } } ->
                             { #fuse_reply_attr{ attr = ?DIRATTR (Ino), attr_timeout_ms = 1000 }, State };
@@ -156,8 +156,8 @@ getattr (_, Ino, _, State) ->
 
 
 lookup (_, ParentIno, BinPath, _, State) ->
-    case gb_trees:lookup(ParentIno, State#amqpfs.inodes) of
-        {value, Path} ->
+    case ets:lookup(State#amqpfs.inodes, ParentIno) of
+        [{ParentIno,Path}] ->
             Path1 = case Path of
                         "/" -> "";
                         _ -> Path
@@ -217,8 +217,8 @@ readdir(Ctx, Ino, Size, Offset, Fi, Cont, State) ->
 
 readdir_async(Ctx, Ino, Size, Offset, Fi, Cont, State) ->
     {Contents, _} =
-        case gb_trees:lookup(Ino, State#amqpfs.inodes) of
-            {value, Path} ->
+        case ets:lookup(State#amqpfs.inodes, Ino) of
+            [{Ino,Path}] ->
                 Path1 = case Path of
                             "/" -> "";
                             _ -> Path
@@ -284,11 +284,15 @@ make_inode (Name,Extra, State) ->
           { Ino, State };
       none ->
           Inodes = State#amqpfs.inodes,
-          { Max, _ } = gb_trees:largest (Inodes),
-          NewInodes = gb_trees:insert (Max + 1, Name, Inodes),
+          Max =
+              case ets:last(Inodes) of
+                  '$end_of_table' ->0;
+                  N -> N
+              end,
+          ets:insert(Inodes, {Max + 1, Name}),
           Names = State#amqpfs.names,
           NewNames = gb_trees:insert (Name, { Max + 1, Extra }, Names),
-          { Max + 1, State#amqpfs{ inodes = NewInodes, names = NewNames } }
+          { Max + 1, State#amqpfs{ names = NewNames } }
   end.
 
 ensure_path("/", State) ->
