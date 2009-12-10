@@ -386,14 +386,10 @@ make_inode (Name,Extra, State) ->
           { Ino, State };
       [] ->
           Inodes = State#amqpfs.inodes,
-          Max =
-              case ets:last(Inodes) of
-                  '$end_of_table' ->0;
-                  N -> N
-              end,
-          ets:insert(Inodes, {Max + 1, Name}),
-          ets:insert (State#amqpfs.names, {Name, {Max + 1, Extra}}),
-          { Max + 1, State }
+          Id = amqpfs_inode:alloc(),
+          ets:insert(Inodes, {Id, Name}),
+          ets:insert (State#amqpfs.names, {Name, {Id, Extra}}),
+          { Id, State }
   end.
 
 ensure_path("/", State) ->
