@@ -44,7 +44,7 @@ response_queue_name(Node) ->
     list_to_binary("amqpfs.response:" ++ atom_to_list(Node)).
 
 provider_queue_name(Name) ->
-    list_to_binary(term_to_string(Name) ++ atom_to_list(node())).
+    list_to_binary(term_to_string(Name) ++ ":" ++ atom_to_list(node())).
     
 
 path_to_matching_routing_key(Path) ->
