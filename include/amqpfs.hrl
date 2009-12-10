@@ -1,0 +1,2 @@
+-include_lib ("fuserl/src/fuserl.hrl").
+-include("rabbitmq-erlang-client/include/amqp_client.hrl").
