@@ -33,6 +33,6 @@ getattr("/simple_on_demand/bogus",State) ->
     #stat{ st_mode = ?S_IFREG bor 8#0444, 
            st_size = length(?BOGUS_CONTENT) };
 
-getattr(Rest,State) ->
+getattr(_,State) ->
     #stat{ st_mode = ?S_IFREG bor 8#0444, 
            st_size = 0 }.
