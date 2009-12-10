@@ -182,6 +182,8 @@ getattr_async(_Ctx, Ino, Cont, #amqpfs{amqp_channel = Channel, amqp_ticket = Tic
             case ets:lookup(State#amqpfs.names, Path) of
                 [{Path, { Ino, {directory, _List} } }] ->
                     #fuse_reply_attr{ attr = ?DIRATTR (Ino), attr_timeout_ms = 1000 };
+                [{"/.amqpfs/version", { Ino, {file, _} } }] ->
+                    #fuse_reply_attr{ attr = #stat{ st_ino = Ino, st_size = length(?AMQPFS_VERSION), st_mode = ?S_IFREG bor 8#0444 }, attr_timeout_ms = 1000 };
                 [{Path, { Ino, {file, undefined} } }] ->
                     #fuse_reply_attr{ attr = #stat{ st_ino = Ino, st_size = 0, st_mode = ?S_IFREG bor 8#0444 }, attr_timeout_ms = 1000 };
                 [{Path, { Ino, {file, on_demand} } }] ->
@@ -280,6 +282,8 @@ open(Ctx, Ino, Fi, Cont, State) ->
 open_async(_Ctx, Ino, Fi, Cont, #amqpfs{amqp_channel = Channel, amqp_ticket = Ticket}=State) ->
     Result =
     case ets:lookup(State#amqpfs.inodes, Ino) of
+        [{Ino, "/.amqpfs/version"}] ->
+            #fuse_reply_open{fuse_file_info = Fi};
         [{Ino,Path}] ->
             Route = register_response_route(State),
             amqp_channel:call(Channel, #'basic.publish'{ticket=Ticket, exchange= <<"amqpfs">>, routing_key = amqpfs_util:path_to_routing_key(Path)}, {amqp_msg, #'P_basic'{message_id = Route}, term_to_binary({open, Path})}),
@@ -314,6 +318,8 @@ read(Ctx, Ino, Size, Offset, Fi, Cont, State) ->
 read_async(_Ctx, Ino, Size, Offset, _Fi, Cont,  #amqpfs{amqp_channel = Channel, amqp_ticket = Ticket}=State) ->
     Result =
     case ets:lookup(State#amqpfs.inodes, Ino) of
+        [{Ino, "/.amqpfs/version"}] ->
+            #fuse_reply_buf { size = length(?AMQPFS_VERSION), buf = list_to_binary(?AMQPFS_VERSION) };
         [{Ino,Path}] ->
             Route = register_response_route(State),
             amqp_channel:call(Channel, #'basic.publish'{ticket=Ticket, exchange= <<"amqpfs">>, routing_key = amqpfs_util:path_to_routing_key(Path)}, {amqp_msg, #'P_basic'{message_id = Route}, term_to_binary({read, Path, Size, Offset})}),
