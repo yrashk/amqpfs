@@ -27,7 +27,7 @@
 %-=====================================================================-
 
 start_link() ->
-    start_link(false, "/amqpfs").
+    start_link(false, proplists:get_value(mount_point, application:get_all_env(amqpfs),"/amqpfs")).
 
 start_link (LinkedIn, Dir) ->
     start_link (LinkedIn, Dir, "").
