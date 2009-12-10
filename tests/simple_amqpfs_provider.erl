@@ -1,7 +1,7 @@
 -module(simple_amqpfs_provider). 
 -behaviour(amqpfs_provider).
 
--export([amqp_credentials/0, init/1, list_dir/2]).
+-export([amqp_credentials/0, init/1, list_dir/2, open/2]).
 
 amqp_credentials() ->
     []. % default
@@ -17,3 +17,6 @@ init(State) ->
 
 list_dir("/simple_on_demand", State) ->
     [{"bogus",{file, undefined}}].
+
+open("/simple_on_demand/bogus", State) ->
+    ok.

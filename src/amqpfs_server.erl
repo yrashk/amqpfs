@@ -259,8 +259,34 @@ lookup_impl(BinPath, Path, List, State) ->
     end.
 
 
-open (_, X, Fi = #fuse_file_info{}, _, State) when X >= 1, X =< 6 ->
-      { #fuse_reply_err{ err = eacces }, State }.
+open(Ctx, Ino, Fi, Cont, State) ->
+    spawn_link(fun () -> open_async(Ctx, Ino, Fi, Cont, State) end),
+    { noreply, State }.
+
+open_async(Ctx, Ino, Fi, Cont, #amqpfs{amqp_channel = Channel, amqp_ticket = Ticket}=State) ->
+    Result =
+    case ets:lookup(State#amqpfs.inodes, Ino) of
+        [{Ino,Path}] ->
+            Route = register_response_route(State),
+            amqp_channel:call(Channel, #'basic.publish'{ticket=Ticket, exchange= <<"amqpfs">>, routing_key = amqpfs_util:path_to_routing_key(Path)}, {amqp_msg, #'P_basic'{message_id = Route}, term_to_binary({open, Path})}),
+            Response = 
+                receive 
+                    {response, Data} -> Data
+                after ?ON_DEMAND_TIMEOUT ->
+                        []
+                end,
+            unregister_response_route(Route, State),
+            case Response of
+                ok -> #fuse_reply_open{fuse_file_info = Fi};
+                enoent -> #fuse_reply_err { err = enoent};
+                _ -> #fuse_reply_err { err = einval}
+            end;
+        _ ->
+            #fuse_reply_err{ err = enoent }
+    end,
+    fuserlsrv:reply(Cont, Result).
+
+
 
 read (_, X, Size, Offset, _Fi, _, State) ->
     { #fuse_reply_err{ err = einval }, State }.
