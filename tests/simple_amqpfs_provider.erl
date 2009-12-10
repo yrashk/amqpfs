@@ -18,7 +18,7 @@ init(State) ->
 
 
 list_dir("/simple_on_demand", State) ->
-    [{"bogus",{file, undefined}}].
+    [{"bogus",{file, on_demand}}].
 
 open("/simple_on_demand/bogus", State) ->
     ok.
@@ -31,4 +31,8 @@ read("/simple_on_demand/bogus", Size, Offset, State) ->
 
 getattr("/simple_on_demand/bogus",State) ->
     #stat{ st_mode = ?S_IFREG bor 8#0444, 
-           st_size = length(?BOGUS_CONTENT) }.
+           st_size = length(?BOGUS_CONTENT) };
+
+getattr(Rest,State) ->
+    #stat{ st_mode = ?S_IFREG bor 8#0444, 
+           st_size = 0 }.

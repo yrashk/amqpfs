@@ -191,6 +191,8 @@ getattr_async(Ctx, Ino, Cont, #amqpfs{amqp_channel = Channel, amqp_ticket = Tick
                 [{Path, { Ino, {directory, _List} } }] ->
                     #fuse_reply_attr{ attr = ?DIRATTR (Ino), attr_timeout_ms = 1000 };
                 [{Path, { Ino, {file, undefined} } }] ->
+                    #fuse_reply_attr{ attr = #stat{ st_ino = Ino, st_size = 0, st_mode = ?S_IFREG bor 8#0444 }, attr_timeout_ms = 1000 };
+                [{Path, { Ino, {file, on_demand} } }] ->
                     Route = register_response_route(State),
                     amqp_channel:call(Channel, #'basic.publish'{ticket=Ticket, exchange= <<"amqpfs">>, routing_key = amqpfs_util:path_to_routing_key(Path)}, {amqp_msg, #'P_basic'{message_id = Route}, term_to_binary({getattr, Path})}),
                     Response = 
