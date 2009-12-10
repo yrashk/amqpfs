@@ -23,7 +23,7 @@ fuserldrv: vendor/fuserl/fuserldrv/src/fuserldrv
 	@true
 
 vendor/fuserl/fuserldrv/src/fuserldrv: vendor/fuserl/fuserldrv/Makefile
-	cd vendor/fuserl/fuserl ; $(MAKE)
+	cd vendor/fuserl/fuserldrv ; $(MAKE)
 
 vendor/fuserl/fuserldrv/Makefile: $(dir vendor/fuserl/fuserldrv)
 	cd vendor/fuserl/fuserldrv ; ./configure
