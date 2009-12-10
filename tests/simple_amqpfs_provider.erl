@@ -1,7 +1,9 @@
 -module(simple_amqpfs_provider). 
 -behaviour(amqpfs_provider).
 
--export([amqp_credentials/0, init/1, list_dir/2, open/2, read/4]).
+-export([amqp_credentials/0, init/1, list_dir/2, open/2, read/4, getattr/2]).
+
+-include_lib("amqpfs/include/amqpfs.hrl").
 
 amqp_credentials() ->
     []. % default
@@ -22,8 +24,11 @@ open("/simple_on_demand/bogus", State) ->
     ok.
 
 
--define(BOGUS_CONTENT, "This is a bogus file. Hello!\n").
+-define(BOGUS_CONTENT, "This is a bogus file. Hello!" ++ [10]).
 
 read("/simple_on_demand/bogus", Size, Offset, State) ->
-    io:format("omg I am reading"),
     list_to_binary(string:substr(?BOGUS_CONTENT, Offset + 1, Size)).
+
+getattr("/simple_on_demand/bogus",State) ->
+    #stat{ st_mode = ?S_IFREG bor 8#0444, 
+           st_size = length(?BOGUS_CONTENT) }.

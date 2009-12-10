@@ -2,7 +2,7 @@
 -export([directory/3, directory/4,
          file/3]).
 
--include("rabbitmq-erlang-client/include/amqp_client.hrl").
+-include_lib("amqpfs/include/amqpfs.hrl").
 
 directory(Channel, Ticket, Path) ->
     directory(Channel, Ticket, Path, on_demand).

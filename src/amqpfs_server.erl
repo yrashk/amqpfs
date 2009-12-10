@@ -12,8 +12,7 @@
            readdir/7,
            readlink/4 ]).
 
--include_lib ("fuserl/src/fuserl.hrl").
--include("rabbitmq-erlang-client/include/amqp_client.hrl").
+-include_lib("amqpfs/include/amqpfs.hrl").
 
 -record (amqpfs, { inodes, 
                    names,
@@ -176,22 +175,43 @@ handle_command({cancel, directory, Path}, State) ->
 handle_command({cancel, file, Path}, State) ->
     State.
 
-getattr (_, Ino, _, State) ->
+getattr(Ctx, Ino, Cont, State) ->
+    spawn_link(fun () -> getattr_async(Ctx,
+                                       Ino,
+                                       Cont,
+                                       State)
+               end),
+    { noreply, State }.
+
+getattr_async(Ctx, Ino, Cont, #amqpfs{amqp_channel = Channel, amqp_ticket = Ticket}=State) ->
+    Result =
     case ets:lookup(State#amqpfs.inodes, Ino) of
         [{Ino, Path}] ->
             case ets:lookup(State#amqpfs.names, Path) of
                 [{Path, { Ino, {directory, _List} } }] ->
-                            { #fuse_reply_attr{ attr = ?DIRATTR (Ino), attr_timeout_ms = 1000 }, State };
-                [{Path, { Ino, {file, _} } }] ->
-                    { #fuse_reply_attr{ attr =    #stat{ st_ino = Ino, 
-                                                         st_mode = ?S_IFREG bor 8#0444, 
-                                                         st_size = 0 }, attr_timeout_ms = 1000 }, State };
+                    #fuse_reply_attr{ attr = ?DIRATTR (Ino), attr_timeout_ms = 1000 };
+                [{Path, { Ino, {file, undefined} } }] ->
+                    Route = register_response_route(State),
+                    amqp_channel:call(Channel, #'basic.publish'{ticket=Ticket, exchange= <<"amqpfs">>, routing_key = amqpfs_util:path_to_routing_key(Path)}, {amqp_msg, #'P_basic'{message_id = Route}, term_to_binary({getattr, Path})}),
+                    Response = 
+                        receive 
+                            {response, Data} -> Data
+                        after ?ON_DEMAND_TIMEOUT ->
+                                []
+                        end,
+                    unregister_response_route(Route, State),
+                    case Response of
+                        #stat{}=Stat -> #fuse_reply_attr{ attr = Stat#stat{ st_ino = Ino }, attr_timeout_ms = 1000 };
+                        Err -> #fuse_reply_err { err = Err}
+                    end;
                 _ ->
-                    { #fuse_reply_err{ err = enoent }, State }
+                    #fuse_reply_err{ err = enoent }
             end;
         _ ->
-            { #fuse_reply_err{ err = enoent }, State }
-    end.
+            #fuse_reply_err{ err = enoent }
+    end,
+    fuserlsrv:reply (Cont, Result).
+
 
 
 lookup(Ctx, ParentIno, BinPath, Cont, State) ->

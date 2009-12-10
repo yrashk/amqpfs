@@ -1,7 +1,7 @@
 -module(amqpfs_util).
 -export([path_to_matching_routing_key/1,path_to_routing_key/1, setup/2, setup_provider_queue/3, provider_queue_name/1, announce_queue_name/0, announce_queue_name/1, response_queue_name/0, response_queue_name/1]).
 
--include("rabbitmq-erlang-client/include/amqp_client.hrl").
+-include_lib("amqpfs/include/amqpfs.hrl").
 
 setup(Channel, Ticket) ->
     #'exchange.declare_ok'{} = amqp_channel:call(Channel, #'exchange.declare'{ticket = Ticket,

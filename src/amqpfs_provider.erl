@@ -17,7 +17,8 @@ behaviour_info(callbacks) ->
       {init, 1},
       {list_dir, 2},
       {open, 2},
-      {read, 4}
+      {read, 4},
+      {getattr, 2}
      ].
 
 -record(amqpfs_provider,
@@ -63,6 +64,8 @@ handle_info_async({#'basic.deliver'{consumer_tag=ConsumerTag, delivery_tag=_Deli
             spawn(fun () -> amqp_channel:call(Channel, #'basic.publish'{ticket=Ticket, exchange= <<"amqpfs.response">>}, {amqp_msg, #'P_basic'{reply_to = MessageId}, term_to_binary(Module:open(Path, State))}) end);
         {read, Path, Size, Offset} ->
             spawn(fun () -> amqp_channel:call(Channel, #'basic.publish'{ticket=Ticket, exchange= <<"amqpfs.response">>}, {amqp_msg, #'P_basic'{reply_to = MessageId}, term_to_binary(Module:read(Path, Size, Offset, State))}) end);
+        {getattr, Path} ->
+            spawn(fun () -> amqp_channel:call(Channel, #'basic.publish'{ticket=Ticket, exchange= <<"amqpfs.response">>}, {amqp_msg, #'P_basic'{reply_to = MessageId}, term_to_binary(Module:getattr(Path, State))}) end);
         Other ->
             io:format("Unknown request ~p~n",[Other])
     end;
