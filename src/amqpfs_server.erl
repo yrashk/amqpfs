@@ -286,10 +286,39 @@ open_async(Ctx, Ino, Fi, Cont, #amqpfs{amqp_channel = Channel, amqp_ticket = Tic
     end,
     fuserlsrv:reply(Cont, Result).
 
+read(Ctx, Ino, Size, Offset, Fi, Cont, State) ->
+    spawn_link(fun () -> read_async(Ctx,
+                                    Ino,
+                                    Size,
+                                    Offset,
+                                    Fi,
+                                    Cont,
+                                    State)
+               end),
+    { noreply, State }.
 
-
-read (_, X, Size, Offset, _Fi, _, State) ->
-    { #fuse_reply_err{ err = einval }, State }.
+read_async(_Ctx, Ino, Size, Offset, _Fi, Cont,  #amqpfs{amqp_channel = Channel, amqp_ticket = Ticket}=State) ->
+    Result =
+    case ets:lookup(State#amqpfs.inodes, Ino) of
+        [{Ino,Path}] ->
+            Route = register_response_route(State),
+            amqp_channel:call(Channel, #'basic.publish'{ticket=Ticket, exchange= <<"amqpfs">>, routing_key = amqpfs_util:path_to_routing_key(Path)}, {amqp_msg, #'P_basic'{message_id = Route}, term_to_binary({read, Path, Size, Offset})}),
+            Response = 
+                receive 
+                    {response, Data} -> Data
+                after ?ON_DEMAND_TIMEOUT ->
+                        []
+                end,
+            unregister_response_route(Route, State),
+            case Response of
+                Buf when is_binary(Buf), size(Buf) =< Size -> #fuse_reply_buf{ size = size(Buf), buf = Buf };
+                eio -> #fuse_reply_err { err = eio};
+                _ -> #fuse_reply_err { err = einval}
+            end;
+        _ ->
+            #fuse_reply_err{ err = enoent }
+    end,
+    fuserlsrv:reply(Cont, Result).
 
 readdir(Ctx, Ino, Size, Offset, Fi, Cont, State) ->
     spawn_link(fun () -> readdir_async (Ctx,
