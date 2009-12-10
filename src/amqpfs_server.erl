@@ -124,9 +124,9 @@ init ([]) ->
 
 code_change (_OldVsn, State, _Extra) -> { ok, State }.
 
-handle_info({#'basic.deliver'{consumer_tag=ConsumerTag, delivery_tag=_DeliveryTag, redelivered=_Redelivered, exchange = <<"amqpfs.response">>, routing_key=RoutingKey}, Content} , #amqpfs{response_routes = Tab, amqp_response_consumer_tag = ConsumerTag}=State) ->
+handle_info({#'basic.deliver'{consumer_tag=ConsumerTag, delivery_tag=_DeliveryTag, redelivered=_Redelivered, exchange = <<"amqpfs.response">>, routing_key=_RoutingKey}, Content} , #amqpfs{response_routes = Tab, amqp_response_consumer_tag = ConsumerTag}=State) ->
     #amqp_msg{payload = Payload } = Content,
-    #'P_basic'{content_type = ContentType, headers = Headers, reply_to = Route} = Content#amqp_msg.props,
+    #'P_basic'{content_type = ContentType, headers = _Headers, reply_to = Route} = Content#amqp_msg.props,
     Response = decode_payload(ContentType, Payload),
     case ets:lookup(Tab, Route) of 
         [{Route, Pid}] ->
@@ -136,9 +136,9 @@ handle_info({#'basic.deliver'{consumer_tag=ConsumerTag, delivery_tag=_DeliveryTa
     end,
     {noreply, State};
     
-handle_info({#'basic.deliver'{consumer_tag=ConsumerTag, delivery_tag=_DeliveryTag, redelivered=_Redelivered, exchange = <<"amqpfs.announce">>, routing_key=RoutingKey}, Content} , #amqpfs{amqp_consumer_tag = ConsumerTag}=State) ->
+handle_info({#'basic.deliver'{consumer_tag=ConsumerTag, delivery_tag=_DeliveryTag, redelivered=_Redelivered, exchange = <<"amqpfs.announce">>, routing_key=_RoutingKey}, Content} , #amqpfs{amqp_consumer_tag = ConsumerTag}=State) ->
     #amqp_msg{payload = Payload } = Content,
-    #'P_basic'{content_type = ContentType, headers = Headers} = Content#amqp_msg.props,
+    #'P_basic'{content_type = ContentType, headers = _Headers} = Content#amqp_msg.props,
     Command = decode_payload(ContentType, Payload),
     {noreply, handle_command(Command, State)};
 
@@ -161,10 +161,10 @@ handle_command({announce, file, {Path, Extra}}, State) ->
     State3 = add_item(filename:dirname(Path),filename:basename(Path), State2),
     State3;
 
-handle_command({cancel, directory, Path}, State) ->
+handle_command({cancel, directory, _Path}, State) ->
     State;
 
-handle_command({cancel, file, Path}, State) ->
+handle_command({cancel, file, _Path}, State) ->
     State.
 
 getattr(Ctx, Ino, Cont, State) ->
@@ -175,7 +175,7 @@ getattr(Ctx, Ino, Cont, State) ->
                end),
     { noreply, State }.
 
-getattr_async(Ctx, Ino, Cont, #amqpfs{amqp_channel = Channel, amqp_ticket = Ticket}=State) ->
+getattr_async(_Ctx, Ino, Cont, #amqpfs{amqp_channel = Channel, amqp_ticket = Ticket}=State) ->
     Result =
     case ets:lookup(State#amqpfs.inodes, Ino) of
         [{Ino, Path}] ->
@@ -217,7 +217,7 @@ lookup(Ctx, ParentIno, BinPath, Cont, State) ->
                end),
     { noreply, State }.
 
-lookup_async(Ctx, ParentIno, BinPath, Cont, State) ->
+lookup_async(_Ctx, ParentIno, BinPath, Cont, State) ->
     case ets:lookup(State#amqpfs.inodes, ParentIno) of
         [{ParentIno,Path}] ->
             Path1 = case Path of
@@ -232,7 +232,7 @@ lookup_async(Ctx, ParentIno, BinPath, Cont, State) ->
                     Response = directory_on_demand(Path, State),
                     List = lists:map(fun ({P,E}) -> 
                                              Path2 = Path1 ++ "/" ++ P,
-                                             {Ino, _} = make_inode(Path2, E, State),
+                                             {_Ino, _} = make_inode(Path2, E, State),
                                              P
                                      end, Response),
                     lookup_impl(BinPath, Path1, List, State);
@@ -277,7 +277,7 @@ open(Ctx, Ino, Fi, Cont, State) ->
     spawn_link(fun () -> open_async(Ctx, Ino, Fi, Cont, State) end),
     { noreply, State }.
 
-open_async(Ctx, Ino, Fi, Cont, #amqpfs{amqp_channel = Channel, amqp_ticket = Ticket}=State) ->
+open_async(_Ctx, Ino, Fi, Cont, #amqpfs{amqp_channel = Channel, amqp_ticket = Ticket}=State) ->
     Result =
     case ets:lookup(State#amqpfs.inodes, Ino) of
         [{Ino,Path}] ->
@@ -345,7 +345,7 @@ readdir(Ctx, Ino, Size, Offset, Fi, Cont, State) ->
                end),
     { noreply, State }.
 
-readdir_async(Ctx, Ino, Size, Offset, Fi, Cont, #amqpfs{amqp_ticket=Ticket, amqp_channel=Channel}=State) ->
+readdir_async(_Ctx, Ino, Size, Offset, _Fi, Cont, #amqpfs{}=State) ->
     {Contents, _} =
         case ets:lookup(State#amqpfs.inodes, Ino) of
             [{Ino,Path}] ->
@@ -413,7 +413,7 @@ readdir_async(Ctx, Ino, Size, Offset, Fi, Cont, #amqpfs{amqp_ticket=Ticket, amqp
              ] ++ Contents)),
     fuserlsrv:reply (Cont, #fuse_reply_direntrylist{ direntrylist = DirEntryList }).
 
-readlink (_, X, _, State) ->
+readlink (_, _, _, State) ->
     { #fuse_reply_err{ err = einval }, State }.
 
 
@@ -466,12 +466,12 @@ add_item(Path, Item, State) ->
     end,
     State.
 
-register_response_route(#amqpfs{response_routes=Tab}=State) ->
+register_response_route(#amqpfs{response_routes=Tab}) ->
     Route = list_to_binary(lists:flatten(io_lib:format("~w",[now()]))),
     ets:insert(Tab, {Route, self()}),
     Route.
 
-unregister_response_route(Route, #amqpfs{response_routes=Tab}=State) ->
+unregister_response_route(Route, #amqpfs{response_routes=Tab}) ->
     ets:delete(Tab, Route).
             
 directory_on_demand(Path, #amqpfs{amqp_ticket = Ticket, amqp_channel = Channel}=State) ->

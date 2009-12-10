@@ -49,9 +49,9 @@ handle_info(Msg, State) ->
     spawn(fun () -> handle_info_async(Msg, State) end),
     {noreply, State}.
 
-handle_info_async({#'basic.deliver'{consumer_tag=ConsumerTag, delivery_tag=_DeliveryTag, redelivered=_Redelivered, exchange = <<"amqpfs">>, routing_key=RoutingKey}, Content}, #amqpfs_provider{module = Module, channel = Channel, ticket = Ticket} = State) ->
+handle_info_async({#'basic.deliver'{consumer_tag=_ConsumerTag, delivery_tag=_DeliveryTag, redelivered=_Redelivered, exchange = <<"amqpfs">>, routing_key=_RoutingKey}, Content}, #amqpfs_provider{module = Module, channel = Channel, ticket = Ticket} = State) ->
     #amqp_msg{payload = Payload } = Content,
-    #'P_basic'{content_type = ContentType, headers = Headers, message_id = MessageId} = Content#amqp_msg.props,
+    #'P_basic'{content_type = ContentType, headers = _Headers, message_id = MessageId} = Content#amqp_msg.props,
     Command =
         case ContentType of
             _ ->
@@ -78,25 +78,25 @@ handle_info_async({#'basic.deliver'{consumer_tag=ConsumerTag, delivery_tag=_Deli
         Other ->
             io:format("Unknown request ~p~n",[Other])
     end;
-handle_info_async(_, State) ->
+handle_info_async(_, _State) ->
     ok.
 
 code_change(_OldVsn, State, _Extra) ->
     State.
 
-terminate(_Reason, State) ->
+terminate(_Reason, _State) ->
     ok.
 %%%%
 
-announce(directory, Name, Contents, #amqpfs_provider{ module = Module, channel = Channel, ticket = Ticket} = State) ->
+announce(directory, Name, Contents, #amqpfs_provider{ channel = Channel, ticket = Ticket} = State) ->
     setup_listener(Name, State),
     amqpfs_announce:directory(Channel, Ticket, Name, Contents).
 
-announce(directory, Name, #amqpfs_provider{ module = Module, channel = Channel, ticket = Ticket} = State) ->
+announce(directory, Name, #amqpfs_provider{ channel = Channel, ticket = Ticket} = State) ->
     setup_listener(Name, State),
     amqpfs_announce:directory(Channel, Ticket, Name);
 
-announce(file, Name, #amqpfs_provider{ module = Module, channel = Channel, ticket = Ticket} = State) ->
+announce(file, Name, #amqpfs_provider{ channel = Channel, ticket = Ticket} = State) ->
     setup_listener(Name, State),
     amqpfs_announce:file(Channel, Ticket, Name).
 

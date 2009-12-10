@@ -17,22 +17,22 @@ init(State) ->
     State.
 
 
-list_dir("/simple_on_demand", State) ->
+list_dir("/simple_on_demand", _State) ->
     [{"bogus",{file, on_demand}}].
 
-open("/simple_on_demand/bogus", State) ->
+open("/simple_on_demand/bogus", _State) ->
     ok.
 
 
 -define(BOGUS_CONTENT, "This is a bogus file. Hello!" ++ [10]).
 
-read("/simple_on_demand/bogus", Size, Offset, State) ->
+read("/simple_on_demand/bogus", Size, Offset, _State) ->
     list_to_binary(string:substr(?BOGUS_CONTENT, Offset + 1, Size)).
 
-getattr("/simple_on_demand/bogus",State) ->
+getattr("/simple_on_demand/bogus", _State) ->
     #stat{ st_mode = ?S_IFREG bor 8#0444, 
            st_size = length(?BOGUS_CONTENT) };
 
-getattr(_,State) ->
+getattr(_,_State) ->
     #stat{ st_mode = ?S_IFREG bor 8#0444, 
            st_size = 0 }.
