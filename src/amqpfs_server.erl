@@ -213,32 +213,7 @@ lookup_async(Ctx, ParentIno, BinPath, Cont, State) ->
             Result =
             case ets:lookup(State#amqpfs.names, Path) of
                 [{Path, { ParentIno, {directory, List} } }] when is_list(List) ->
-                    case lists:any(fun (P) -> P == BinPath end,  lists:map(fun erlang:list_to_binary/1, List)) of
-                        true -> % there is something
-                            Path2 = Path1 ++ "/" ++ binary_to_list(BinPath),
-                            case ets:lookup(State#amqpfs.names, Path2) of
-                                [{Path2, {Ino, {directory, _List}}}] ->
-                                    #fuse_reply_entry{ 
-                                  fuse_entry_param = #fuse_entry_param{ ino = Ino,
-                                                                        generation = 1,  % (?)
-                                                                        attr_timeout_ms = 1000,
-                                                                        entry_timeout_ms = 1000,
-                                                                        attr = ?DIRATTR (Ino) } };
-                                [{Path2, {Ino, {file, _}}}] ->
-                                    #fuse_reply_entry{ 
-                                  fuse_entry_param = #fuse_entry_param{ ino = Ino,
-                                                                        generation = 1,  % (?)
-                                                                        attr_timeout_ms = 1000,
-                                                                        entry_timeout_ms = 1000,
-                                                                        attr = #stat{ st_ino = Ino, 
-                                                                                      st_mode = ?S_IFREG bor 8#0444, 
-                                                                                      st_size = 0 } } };
-                                _ ->
-                                    #fuse_reply_err{ err = enoent }
-                            end;
-                        false ->
-                            #fuse_reply_err{ err = enoent }
-                    end;
+                    lookup_impl(BinPath, Path1, List, State);
                 [{Path, { ParentIno, {directory, on_demand}}}] ->
                     Response = directory_on_demand(Path, State),
                     List = lists:map(fun ({P,E}) -> 
@@ -246,33 +221,7 @@ lookup_async(Ctx, ParentIno, BinPath, Cont, State) ->
                                              {Ino, _} = make_inode(Path2, E, State),
                                              P
                                      end, Response),
-                    case lists:any(fun (P) -> P == BinPath end,  lists:map(fun erlang:list_to_binary/1, List)) of % copy paste (almost)
-                        true -> % there is something
-                            Path2 = Path1 ++ "/" ++ binary_to_list(BinPath),
-                            case ets:lookup(State#amqpfs.names, Path2) of
-                                [{Path2, {Ino, {directory, _List}}}] ->
-                                    #fuse_reply_entry{ 
-                                  fuse_entry_param = #fuse_entry_param{ ino = Ino,
-                                                                        generation = 1,  % (?)
-                                                                        attr_timeout_ms = 1000,
-                                                                        entry_timeout_ms = 1000,
-                                                                        attr = ?DIRATTR (Ino) } };
-                                [{Path2, {Ino, {file, _}}}] ->
-                                    #fuse_reply_entry{ 
-                                  fuse_entry_param = #fuse_entry_param{ ino = Ino,
-                                                                        generation = 1,  % (?)
-                                                                        attr_timeout_ms = 1000,
-                                                                        entry_timeout_ms = 1000,
-                                                                        attr = #stat{ st_ino = Ino, 
-                                                                                      st_mode = ?S_IFREG bor 8#0444, 
-                                                                                      st_size = 0 } } };
-                                _ ->
-                                    #fuse_reply_err{ err = enoent }
-                            end;
-                        false ->
-                            #fuse_reply_err{ err = enoent }
-                    end;                    
-            
+                    lookup_impl(BinPath, Path1, List, State);
                 _ ->
                     #fuse_reply_err{ err = enoent }
             end,
@@ -280,6 +229,35 @@ lookup_async(Ctx, ParentIno, BinPath, Cont, State) ->
         _ ->
             fuserlsrv:reply (Cont, #fuse_reply_err{ err = enoent })
     end.
+
+lookup_impl(BinPath, Path, List, State) ->
+    case lists:any(fun (P) -> P == BinPath end,  lists:map(fun erlang:list_to_binary/1, List)) of
+        true -> % there is something
+            Path2 = Path ++ "/" ++ binary_to_list(BinPath),
+            case ets:lookup(State#amqpfs.names, Path2) of
+                [{Path2, {Ino, {directory, _List}}}] ->
+                    #fuse_reply_entry{ 
+                  fuse_entry_param = #fuse_entry_param{ ino = Ino,
+                                                        generation = 1,  % (?)
+                                                        attr_timeout_ms = 1000,
+                                                        entry_timeout_ms = 1000,
+                                                        attr = ?DIRATTR (Ino) } };
+                [{Path2, {Ino, {file, _}}}] ->
+                    #fuse_reply_entry{ 
+                  fuse_entry_param = #fuse_entry_param{ ino = Ino,
+                                                        generation = 1,  % (?)
+                                                        attr_timeout_ms = 1000,
+                                                        entry_timeout_ms = 1000,
+                                                        attr = #stat{ st_ino = Ino, 
+                                                                      st_mode = ?S_IFREG bor 8#0444, 
+                                                                      st_size = 0 } } };
+                _ ->
+                    #fuse_reply_err{ err = enoent }
+            end;
+        false ->
+            #fuse_reply_err{ err = enoent }
+    end.
+
 
 open (_, X, Fi = #fuse_file_info{}, _, State) when X >= 1, X =< 6 ->
       { #fuse_reply_err{ err = eacces }, State }.
@@ -440,3 +418,4 @@ directory_on_demand(Path, #amqpfs{amqp_ticket = Ticket, amqp_channel = Channel}=
     Response.
     
     
+
