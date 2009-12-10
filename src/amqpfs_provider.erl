@@ -9,7 +9,7 @@
 
 -export([announce/3, announce/4]).
 
--include("rabbitmq-erlang-client/include/amqp_client.hrl").
+-include_lib("amqpfs/include/amqpfs.hrl").
 
 behaviour_info(callbacks) ->
     [ 
@@ -59,13 +59,22 @@ handle_info_async({#'basic.deliver'{consumer_tag=ConsumerTag, delivery_tag=_Deli
                 end,
     case Command of
         {list, directory, Path} ->
-            spawn(fun () -> amqp_channel:call(Channel, #'basic.publish'{ticket=Ticket, exchange= <<"amqpfs.response">>}, {amqp_msg, #'P_basic'{reply_to = MessageId}, term_to_binary(Module:list_dir(Path, State))}) end);
+            spawn(fun () -> amqp_channel:call(Channel, #'basic.publish'{ticket=Ticket, exchange= <<"amqpfs.response">>}, {amqp_msg, #'P_basic'{reply_to = MessageId, content_type = ?CONTENT_TYPE_BERT }, term_to_binary(Module:list_dir(Path, State))}) end);
         {open, Path} ->
-            spawn(fun () -> amqp_channel:call(Channel, #'basic.publish'{ticket=Ticket, exchange= <<"amqpfs.response">>}, {amqp_msg, #'P_basic'{reply_to = MessageId}, term_to_binary(Module:open(Path, State))}) end);
+            spawn(fun () -> amqp_channel:call(Channel, #'basic.publish'{ticket=Ticket, exchange= <<"amqpfs.response">>}, {amqp_msg, #'P_basic'{reply_to = MessageId, content_type = ?CONTENT_TYPE_BERT }, term_to_binary(Module:open(Path, State))}) end);
         {read, Path, Size, Offset} ->
-            spawn(fun () -> amqp_channel:call(Channel, #'basic.publish'{ticket=Ticket, exchange= <<"amqpfs.response">>}, {amqp_msg, #'P_basic'{reply_to = MessageId}, term_to_binary(Module:read(Path, Size, Offset, State))}) end);
+            spawn(fun () -> 
+                          {ResultContentType, Result} = 
+                          case Module:read(Path, Size, Offset, State) of
+                              Datum when is_binary(Datum) ->
+                                  {?CONTENT_TYPE_BIN, Datum};
+                              Datum ->
+                                  {?CONTENT_TYPE_BERT, term_to_binary(Datum)}
+                          end,
+                          amqp_channel:call(Channel, #'basic.publish'{ticket=Ticket, exchange= <<"amqpfs.response">>}, {amqp_msg, #'P_basic'{reply_to = MessageId, content_type = ResultContentType}, Result}) 
+                  end);
         {getattr, Path} ->
-            spawn(fun () -> amqp_channel:call(Channel, #'basic.publish'{ticket=Ticket, exchange= <<"amqpfs.response">>}, {amqp_msg, #'P_basic'{reply_to = MessageId}, term_to_binary(Module:getattr(Path, State))}) end);
+            spawn(fun () -> amqp_channel:call(Channel, #'basic.publish'{ticket=Ticket, exchange= <<"amqpfs.response">>}, {amqp_msg, #'P_basic'{reply_to = MessageId, content_type = ?CONTENT_TYPE_BERT}, term_to_binary(Module:getattr(Path, State))}) end);
         Other ->
             io:format("Unknown request ~p~n",[Other])
     end;

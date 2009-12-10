@@ -127,11 +127,7 @@ code_change (_OldVsn, State, _Extra) -> { ok, State }.
 handle_info({#'basic.deliver'{consumer_tag=ConsumerTag, delivery_tag=_DeliveryTag, redelivered=_Redelivered, exchange = <<"amqpfs.response">>, routing_key=RoutingKey}, Content} , #amqpfs{response_routes = Tab, amqp_response_consumer_tag = ConsumerTag}=State) ->
     #amqp_msg{payload = Payload } = Content,
     #'P_basic'{content_type = ContentType, headers = Headers, reply_to = Route} = Content#amqp_msg.props,
-    Response =
-    case ContentType of
-        _ ->
-            binary_to_term(Payload)
-    end,
+    Response = decode_payload(ContentType, Payload),
     case ets:lookup(Tab, Route) of 
         [{Route, Pid}] ->
             Pid ! {response, Response};
@@ -143,11 +139,7 @@ handle_info({#'basic.deliver'{consumer_tag=ConsumerTag, delivery_tag=_DeliveryTa
 handle_info({#'basic.deliver'{consumer_tag=ConsumerTag, delivery_tag=_DeliveryTag, redelivered=_Redelivered, exchange = <<"amqpfs.announce">>, routing_key=RoutingKey}, Content} , #amqpfs{amqp_consumer_tag = ConsumerTag}=State) ->
     #amqp_msg{payload = Payload } = Content,
     #'P_basic'{content_type = ContentType, headers = Headers} = Content#amqp_msg.props,
-    Command =
-    case ContentType of
-        _ ->
-            binary_to_term(Payload)
-    end,
+    Command = decode_payload(ContentType, Payload),
     {noreply, handle_command(Command, State)};
 
 handle_info (_Msg, State) -> { noreply, State }.
@@ -494,5 +486,14 @@ directory_on_demand(Path, #amqpfs{amqp_ticket = Ticket, amqp_channel = Channel}=
     unregister_response_route(Route, State),        
     Response.
     
+decode_payload(ContentType, Payload) ->    
+    case ContentType of
+        ?CONTENT_TYPE_BERT ->
+            binary_to_term(Payload);
+        ?CONTENT_TYPE_BIN ->
+            Payload;
+        _ ->
+            binary_to_term(Payload) % by default, attempt BERT, but FIXME: it might be a bad idea in a long run
+    end.
     
 
