@@ -15,7 +15,7 @@ behaviour_info(callbacks) ->
     [ 
       {amqp_credentials, 0},
       {init, 1},
-      {list_dir, 1}
+      {list_dir, 2}
      ].
 
 -record(amqpfs_provider,
@@ -56,7 +56,7 @@ handle_info_async({#'basic.deliver'{consumer_tag=ConsumerTag, delivery_tag=_Deli
                 end,
             case Command of
                 {list, directory, Path} ->
-                    spawn(fun () -> amqp_channel:call(Channel, #'basic.publish'{ticket=Ticket, exchange= <<"amqpfs.response">>}, {amqp_msg, #'P_basic'{reply_to = MessageId}, term_to_binary(Module:list_dir(Path))}) end);
+                    spawn(fun () -> amqp_channel:call(Channel, #'basic.publish'{ticket=Ticket, exchange= <<"amqpfs.response">>}, {amqp_msg, #'P_basic'{reply_to = MessageId}, term_to_binary(Module:list_dir(Path, State))}) end);
                 Other ->
                     io:format("Unknown request ~p~n",[Other])
             end;
