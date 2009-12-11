@@ -168,7 +168,7 @@ getattr(Ctx, Ino, Cont, State) ->
                end),
     { noreply, State }.
 
-getattr_async(_Ctx, Ino, Cont, #amqpfs{amqp_channel = Channel}=State) ->
+getattr_async(_Ctx, Ino, Cont, State) ->
     Result =
     case ets:lookup(State#amqpfs.inodes, Ino) of
         [{Ino, Path}] ->
@@ -180,16 +180,7 @@ getattr_async(_Ctx, Ino, Cont, #amqpfs{amqp_channel = Channel}=State) ->
                 [{Path, { Ino, {file, undefined} } }] ->
                     #fuse_reply_attr{ attr = #stat{ st_ino = Ino, st_size = 0, st_mode = ?S_IFREG bor 8#0444 }, attr_timeout_ms = 1000 };
                 [{Path, { Ino, {file, on_demand} } }] ->
-                    Route = register_response_route(State),
-                    amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs">>, routing_key = amqpfs_util:path_to_routing_key(Path)}, {amqp_msg, #'P_basic'{message_id = Route, headers = env_headers(State)}, term_to_binary({getattr, Path})}),
-                    Response = 
-                        receive 
-                            {response, Data} -> Data
-                        after ?ON_DEMAND_TIMEOUT ->
-                                []
-                        end,
-                    unregister_response_route(Route, State),
-                    case Response of
+                    case remote_getattr(Path, State) of
                         #stat{}=Stat -> #fuse_reply_attr{ attr = Stat#stat{ st_ino = Ino }, attr_timeout_ms = 1000 };
                         Err -> #fuse_reply_err { err = Err}
                     end;
@@ -251,6 +242,14 @@ lookup_impl(BinPath, Path, List, State) ->
                                                         attr_timeout_ms = 1000,
                                                         entry_timeout_ms = 1000,
                                                         attr = ?DIRATTR (Ino) } };
+                [{Path2, {Ino, {file, on_demand}}}] ->
+                    Stat = remote_getattr(Path2, State),
+                    #fuse_reply_entry{ 
+                  fuse_entry_param = #fuse_entry_param{ ino = Ino,
+                                                        generation = 1,  % (?)
+                                                        attr_timeout_ms = 1000,
+                                                        entry_timeout_ms = 1000,
+                                                        attr = Stat#stat{ st_ino = Ino } } };
                 [{Path2, {Ino, {file, _}}}] ->
                     #fuse_reply_entry{ 
                   fuse_entry_param = #fuse_entry_param{ ino = Ino,
@@ -361,6 +360,9 @@ readdir_async(_Ctx, Ino, Size, Offset, _Fi, Cont, #amqpfs{}=State) ->
                                             case ets:lookup(State#amqpfs.names, Path2) of                      
                                                 [{Path2, {ChildIno, {directory, _Extra}}}] ->
                                                     {L ++ [#direntry{ name = P, offset = Acc, stat = ?DIRATTR(ChildIno)}], Acc + 1};
+                                                [{Path2, {ChildIno, {file, on_demand}}}] ->
+                                                    Stat = remote_getattr(Path, State),
+                                                    {L ++ [#direntry{ name = P, offset = Acc, stat = Stat#stat{ st_ino = ChildIno } }], Acc + 1};
                                                 [{Path2, {ChildIno, {file, _}}}] ->
                                                     {L ++ [#direntry{ name = P, offset = Acc, stat = 
                                                                       #stat{ st_ino = ChildIno, 
@@ -484,6 +486,19 @@ directory_on_demand(Path, #amqpfs{amqp_channel = Channel}=State) ->
         end,
     unregister_response_route(Route, State),        
     Response.
+
+remote_getattr(Path, #amqpfs{amqp_channel = Channel}=State) ->
+    Route = register_response_route(State),
+    amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs">>, routing_key = amqpfs_util:path_to_routing_key(Path)}, {amqp_msg, #'P_basic'{message_id = Route, headers = env_headers(State)}, term_to_binary({getattr, Path})}),
+    Response = 
+        receive 
+            {response, Data} -> Data
+                        after ?ON_DEMAND_TIMEOUT ->
+                                []
+                        end,
+    unregister_response_route(Route, State),
+    Response.
+
     
 decode_payload(ContentType, Payload) ->    
     case ContentType of
@@ -499,3 +514,5 @@ env_headers(_State) ->
     {ok, Hostname} = inet:gethostname(),
     [{"node", longstr, atom_to_list(node())},
      {"hostname", longstr, Hostname}].
+
+
