@@ -49,27 +49,32 @@ handle_info_async({#'basic.deliver'{consumer_tag=_ConsumerTag, delivery_tag=_Del
             _ ->
                 binary_to_term(Payload)
         end,
-    ReqState = State#amqpfs_provider_state{ request_headers = Headers },
-    case Command of
-        {list, directory, Path} ->
-            spawn(fun () -> amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs.response">>}, {amqp_msg, #'P_basic'{reply_to = MessageId, content_type = ?CONTENT_TYPE_BERT }, term_to_binary(Module:list_dir(Path, ReqState))}) end);
-        {open, Path} ->
-            spawn(fun () -> amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs.response">>}, {amqp_msg, #'P_basic'{reply_to = MessageId, content_type = ?CONTENT_TYPE_BERT }, term_to_binary(Module:open(Path, ReqState))}) end);
-        {read, Path, Size, Offset} ->
-            spawn(fun () -> 
-                          {ResultContentType, Result} = 
-                          case Module:read(Path, Size, Offset, ReqState) of
-                              Datum when is_binary(Datum) ->
-                                  {?CONTENT_TYPE_BIN, Datum};
-                              Datum ->
-                                  {?CONTENT_TYPE_BERT, term_to_binary(Datum)}
-                          end,
-                          amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs.response">>}, {amqp_msg, #'P_basic'{reply_to = MessageId, content_type = ResultContentType}, Result}) 
-                  end);
-        {getattr, Path} ->
-            spawn(fun () -> amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs.response">>}, {amqp_msg, #'P_basic'{reply_to = MessageId, content_type = ?CONTENT_TYPE_BERT}, term_to_binary(Module:getattr(Path, ReqState))}) end);
-        Other ->
-            io:format("Unknown request ~p~n",[Other])
+    ReqState = State#amqpfs_provider_state{ request_headers = Headers, request_command = Command },
+    case (catch Module:allow_request(ReqState)) of
+        false ->
+            skip;
+        _ ->
+            case Command of
+                {list, directory, Path} ->
+                    spawn(fun () -> amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs.response">>}, {amqp_msg, #'P_basic'{reply_to = MessageId, content_type = ?CONTENT_TYPE_BERT }, term_to_binary(Module:list_dir(Path, ReqState))}) end);
+                {open, Path} ->
+                    spawn(fun () -> amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs.response">>}, {amqp_msg, #'P_basic'{reply_to = MessageId, content_type = ?CONTENT_TYPE_BERT }, term_to_binary(Module:open(Path, ReqState))}) end);
+                {read, Path, Size, Offset} ->
+                    spawn(fun () -> 
+                                  {ResultContentType, Result} = 
+                                      case Module:read(Path, Size, Offset, ReqState) of
+                                          Datum when is_binary(Datum) ->
+                                              {?CONTENT_TYPE_BIN, Datum};
+                                          Datum ->
+                                              {?CONTENT_TYPE_BERT, term_to_binary(Datum)}
+                                      end,
+                                  amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs.response">>}, {amqp_msg, #'P_basic'{reply_to = MessageId, content_type = ResultContentType}, Result}) 
+                          end);
+                {getattr, Path} ->
+                    spawn(fun () -> amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs.response">>}, {amqp_msg, #'P_basic'{reply_to = MessageId, content_type = ?CONTENT_TYPE_BERT}, term_to_binary(Module:getattr(Path, ReqState))}) end);
+                Other ->
+                    io:format("Unknown request ~p~n",[Other])
+            end
     end;
 handle_info_async(_, _State) ->
     ok.

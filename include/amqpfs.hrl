@@ -11,5 +11,6 @@
           module,
           connection,
           channel,
-          request_headers
+          request_headers,
+          request_command
          }).
