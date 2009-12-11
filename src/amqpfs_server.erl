@@ -450,7 +450,7 @@ unregister_response_route(Route, #amqpfs{response_routes=Tab}) ->
             
 directory_on_demand(Path, #amqpfs{amqp_channel = Channel}=State) ->
     Route = register_response_route(State),
-    amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs">>, routing_key = amqpfs_util:path_to_routing_key(Path)}, {amqp_msg, #'P_basic'{message_id = Route, headers = env_headers(State)}, term_to_binary({list, directory, Path})}),
+    amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs">>, routing_key = amqpfs_util:path_to_routing_key(Path)}, {amqp_msg, #'P_basic'{message_id = Route, headers = env_headers(State)}, term_to_binary({list_dir, Path})}),
     Response = 
         receive 
             {response, Data} -> Data

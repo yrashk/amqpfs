@@ -55,7 +55,7 @@ handle_info_async({#'basic.deliver'{consumer_tag=_ConsumerTag, delivery_tag=_Del
             skip;
         _ ->
             case Command of
-                {list, directory, Path} ->
+                {list_dir, Path} ->
                     spawn(fun () -> amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs.response">>}, {amqp_msg, #'P_basic'{reply_to = MessageId, content_type = ?CONTENT_TYPE_BERT }, term_to_binary(Module:list_dir(Path, ReqState))}) end);
                 {open, Path} ->
                     spawn(fun () -> amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs.response">>}, {amqp_msg, #'P_basic'{reply_to = MessageId, content_type = ?CONTENT_TYPE_BERT }, term_to_binary(Module:open(Path, ReqState))}) end);
