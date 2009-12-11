@@ -91,28 +91,7 @@ init ([]) ->
                       amqp_consumer_tag = ConsumerTag,
                       amqp_response_consumer_tag = ResponseConsumerTag
                   },
-    State = lists:foldl(fun (D, StateAcc) -> 
-                                case D of
-                                    {Path, {directory, Contents}} ->
-                                        case filename:basename(Path) of
-                                            "" -> % root
-                                                {_, StateAcc1} = make_inode("/", {directory, Contents}, StateAcc),
-                                                StateAcc1;
-                                            _ ->
-                                                {_, StateAcc1} = ensure_path(filename:dirname(Path), StateAcc),
-                                                {_, StateAcc2} = make_inode(Path, {directory, Contents}, StateAcc1),
-                                                StateAcc2
-                                        end;
-                                    {Path, {file, X}} ->
-                                        {_, StateAcc1} = make_inode(Path, {file, X}, StateAcc),
-                                        StateAcc1
-                                end
-                        end, State0, 
-                        [{"/", {directory, [".amqpfs"]}},
-                         {"/.amqpfs", {directory, ["version","server"]}},
-                         {"/.amqpfs/version", {file, undefined}},
-                         {"/.amqpfs/server", {file, undefined}}
-                        ]),
+    {_, State} = make_inode("/", {directory, []}, State0),
     { ok, State }.
 
 code_change (_OldVsn, State, _Extra) -> { ok, State }.
@@ -175,8 +154,6 @@ getattr_async(_Ctx, Ino, Cont, State) ->
             case ets:lookup(State#amqpfs.names, Path) of
                 [{Path, { Ino, {directory, _List} } }] ->
                     #fuse_reply_attr{ attr = ?DIRATTR (Ino), attr_timeout_ms = 1000 };
-                [{"/.amqpfs/version", { Ino, {file, _} } }] ->
-                    #fuse_reply_attr{ attr = #stat{ st_ino = Ino, st_size = length(?AMQPFS_VERSION), st_mode = ?S_IFREG bor 8#0444 }, attr_timeout_ms = 1000 };
                 [{Path, { Ino, {file, undefined} } }] ->
                     #fuse_reply_attr{ attr = #stat{ st_ino = Ino, st_size = 0, st_mode = ?S_IFREG bor 8#0444 }, attr_timeout_ms = 1000 };
                 [{Path, { Ino, {file, on_demand} } }] ->
@@ -274,8 +251,6 @@ open(Ctx, Ino, Fi, Cont, State) ->
 open_async(_Ctx, Ino, Fi, Cont, #amqpfs{amqp_channel = Channel}=State) ->
     Result =
     case ets:lookup(State#amqpfs.inodes, Ino) of
-        [{Ino, "/.amqpfs/version"}] ->
-            #fuse_reply_open{fuse_file_info = Fi};
         [{Ino,Path}] ->
             Route = register_response_route(State),
             amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs">>, routing_key = amqpfs_util:path_to_routing_key(Path)}, {amqp_msg, #'P_basic'{message_id = Route, headers = env_headers(State)}, term_to_binary({open, Path})}),
@@ -310,8 +285,6 @@ read(Ctx, Ino, Size, Offset, Fi, Cont, State) ->
 read_async(_Ctx, Ino, Size, Offset, _Fi, Cont,  #amqpfs{amqp_channel = Channel}=State) ->
     Result =
     case ets:lookup(State#amqpfs.inodes, Ino) of
-        [{Ino, "/.amqpfs/version"}] ->
-            #fuse_reply_buf { size = length(?AMQPFS_VERSION), buf = list_to_binary(?AMQPFS_VERSION) };
         [{Ino,Path}] ->
             Route = register_response_route(State),
             amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs">>, routing_key = amqpfs_util:path_to_routing_key(Path)}, {amqp_msg, #'P_basic'{message_id = Route, headers = env_headers(State)}, term_to_binary({read, Path, Size, Offset})}),
