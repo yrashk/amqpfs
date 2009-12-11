@@ -28,10 +28,10 @@ vendor/fuserl/fuserldrv/src/fuserldrv: vendor/fuserl/fuserldrv/Makefile
 vendor/fuserl/fuserldrv/Makefile: $(dir vendor/fuserl/fuserldrv)
 	cd vendor/fuserl/fuserldrv ; ./configure
 
-run:
+run: main
 	@erl -pa tests ebin vendor/fuserl/fuserl/src/ vendor/erabbitmq/ebin/ vendor/rabbitmq-erlang-client/ebin/ vendor/rabbitmq-server/ebin/ -boot start_sasl -eval "application:load(fuserl)" -config configs/development -s erabbitmq -s amqpfs
 
-run-simple:
+run-simple: main
 	@erl -pa tests ebin vendor/fuserl/fuserl/src/ vendor/erabbitmq/ebin/ vendor/rabbitmq-erlang-client/ebin/ vendor/rabbitmq-server/ebin/ -boot start_sasl -eval "application:load(fuserl)" -config configs/development -s erabbitmq -s amqpfs -eval "amqpfs_provider:start(simple_amqpfs_provider)"
 
 
