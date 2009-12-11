@@ -181,7 +181,7 @@ getattr_async(_Ctx, Ino, Cont, #amqpfs{amqp_channel = Channel}=State) ->
                     #fuse_reply_attr{ attr = #stat{ st_ino = Ino, st_size = 0, st_mode = ?S_IFREG bor 8#0444 }, attr_timeout_ms = 1000 };
                 [{Path, { Ino, {file, on_demand} } }] ->
                     Route = register_response_route(State),
-                    amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs">>, routing_key = amqpfs_util:path_to_routing_key(Path)}, {amqp_msg, #'P_basic'{message_id = Route}, term_to_binary({getattr, Path})}),
+                    amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs">>, routing_key = amqpfs_util:path_to_routing_key(Path)}, {amqp_msg, #'P_basic'{message_id = Route, headers = env_headers(State)}, term_to_binary({getattr, Path})}),
                     Response = 
                         receive 
                             {response, Data} -> Data
@@ -279,7 +279,7 @@ open_async(_Ctx, Ino, Fi, Cont, #amqpfs{amqp_channel = Channel}=State) ->
             #fuse_reply_open{fuse_file_info = Fi};
         [{Ino,Path}] ->
             Route = register_response_route(State),
-            amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs">>, routing_key = amqpfs_util:path_to_routing_key(Path)}, {amqp_msg, #'P_basic'{message_id = Route}, term_to_binary({open, Path})}),
+            amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs">>, routing_key = amqpfs_util:path_to_routing_key(Path)}, {amqp_msg, #'P_basic'{message_id = Route, headers = env_headers(State)}, term_to_binary({open, Path})}),
             Response = 
                 receive 
                     {response, Data} -> Data
@@ -315,7 +315,7 @@ read_async(_Ctx, Ino, Size, Offset, _Fi, Cont,  #amqpfs{amqp_channel = Channel}=
             #fuse_reply_buf { size = length(?AMQPFS_VERSION), buf = list_to_binary(?AMQPFS_VERSION) };
         [{Ino,Path}] ->
             Route = register_response_route(State),
-            amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs">>, routing_key = amqpfs_util:path_to_routing_key(Path)}, {amqp_msg, #'P_basic'{message_id = Route}, term_to_binary({read, Path, Size, Offset})}),
+            amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs">>, routing_key = amqpfs_util:path_to_routing_key(Path)}, {amqp_msg, #'P_basic'{message_id = Route, headers = env_headers(State)}, term_to_binary({read, Path, Size, Offset})}),
             Response = 
                 receive 
                     {response, Data} -> Data
@@ -475,7 +475,7 @@ unregister_response_route(Route, #amqpfs{response_routes=Tab}) ->
             
 directory_on_demand(Path, #amqpfs{amqp_channel = Channel}=State) ->
     Route = register_response_route(State),
-    amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs">>, routing_key = amqpfs_util:path_to_routing_key(Path)}, {amqp_msg, #'P_basic'{message_id = Route}, term_to_binary({list, directory, Path})}),
+    amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs">>, routing_key = amqpfs_util:path_to_routing_key(Path)}, {amqp_msg, #'P_basic'{message_id = Route, headers = env_headers(State)}, term_to_binary({list, directory, Path})}),
     Response = 
         receive 
             {response, Data} -> Data
@@ -495,4 +495,7 @@ decode_payload(ContentType, Payload) ->
             binary_to_term(Payload) % by default, attempt BERT, but FIXME: it might be a bad idea in a long run
     end.
     
-
+env_headers(_State) ->
+    {ok, Hostname} = inet:gethostname(),
+    [{"node", longstr, atom_to_list(node())},
+     {"hostname", longstr, Hostname}].

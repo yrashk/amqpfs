@@ -17,8 +17,9 @@ init(State) ->
     State.
 
 
-list_dir("/simple_on_demand", _State) ->
-    [{"bogus",{file, on_demand}}].
+list_dir("/simple_on_demand", State) ->
+    {value, {_, _, Node }} = lists:keysearch(<<"node">>,1,State#amqpfs_provider_state.request_headers),
+    [{"bogus",{file, on_demand}}, {binary_to_list(Node), {file, on_demand}}].
 
 open("/simple_on_demand/bogus", _State) ->
     ok.

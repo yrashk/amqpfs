@@ -6,3 +6,10 @@
 -define(CONTENT_TYPE_BIN, <<"application/octet-stream">>).
 -define(CONTENT_TYPE_BERT, <<"application/x-bert">>).
 
+-record(amqpfs_provider_state,
+        {
+          module,
+          connection,
+          channel,
+          request_headers
+         }).
