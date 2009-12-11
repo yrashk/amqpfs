@@ -1,31 +1,31 @@
 -module(amqpfs_util).
--export([path_to_matching_routing_key/1,path_to_routing_key/1, setup/2, setup_provider_queue/3, provider_queue_name/1, announce_queue_name/0, announce_queue_name/1, response_queue_name/0, response_queue_name/1]).
+-export([path_to_matching_routing_key/1,path_to_routing_key/1, setup/1, setup_provider_queue/2, provider_queue_name/1, announce_queue_name/0, announce_queue_name/1, response_queue_name/0, response_queue_name/1]).
 
 -include_lib("amqpfs/include/amqpfs.hrl").
 
-setup(Channel, Ticket) ->
-    #'exchange.declare_ok'{} = amqp_channel:call(Channel, #'exchange.declare'{ticket = Ticket,
+setup(Channel) ->
+    #'exchange.declare_ok'{} = amqp_channel:call(Channel, #'exchange.declare'{
                                                                               exchange = <<"amqpfs.announce">>,
                                                                               type = <<"fanout">>,
                                                                               passive = false, durable = true,
                                                                               auto_delete = false, internal = false,
                                                                               nowait = false, arguments = []}),
-    #'exchange.declare_ok'{} = amqp_channel:call(Channel, #'exchange.declare'{ticket = Ticket,
+    #'exchange.declare_ok'{} = amqp_channel:call(Channel, #'exchange.declare'{
                                                                               exchange = <<"amqpfs.response">>,
                                                                               type = <<"direct">>,
                                                                               passive = false, durable = false,
                                                                               auto_delete = false, internal = false,
                                                                               nowait = false, arguments = []}),
-    #'exchange.declare_ok'{} = amqp_channel:call(Channel, #'exchange.declare'{ticket = Ticket,
+    #'exchange.declare_ok'{} = amqp_channel:call(Channel, #'exchange.declare'{
                                                                               exchange = <<"amqpfs">>,
                                                                               type = <<"topic">>,
                                                                               passive = false, durable = false,
                                                                               auto_delete = false, internal = false,
                                                                               nowait = false, arguments = []}).
 
-setup_provider_queue(Channel, Ticket, Name) ->
+setup_provider_queue(Channel, Name) ->
     Queue = provider_queue_name(Name),
-    #'queue.declare_ok'{} = amqp_channel:call(Channel, #'queue.declare'{ticket = Ticket,
+    #'queue.declare_ok'{} = amqp_channel:call(Channel, #'queue.declare'{
                                                                         queue = Queue,
                                                                         passive = false, durable = false,
                                                                         exclusive = false, auto_delete = false,

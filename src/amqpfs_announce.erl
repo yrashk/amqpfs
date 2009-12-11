@@ -1,16 +1,16 @@
 -module(amqpfs_announce).
--export([directory/3, directory/4,
-         file/3]).
+-export([directory/2, directory/3,
+         file/2]).
 
 -include_lib("amqpfs/include/amqpfs.hrl").
 
-directory(Channel, Ticket, Path) ->
-    directory(Channel, Ticket, Path, on_demand).
+directory(Channel, Path) ->
+    directory(Channel, Path, on_demand).
 
-directory(Channel, Ticket, Path, Contents) ->
-    amqp_channel:call(Channel, #'basic.publish'{ticket=Ticket, exchange= <<"amqpfs.announce">>}, {amqp_msg, #'P_basic'{}, term_to_binary({announce, directory, {Path,Contents}})}).
+directory(Channel, Path, Contents) ->
+    amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs.announce">>}, {amqp_msg, #'P_basic'{}, term_to_binary({announce, directory, {Path,Contents}})}).
 
-file(Channel, Ticket, Path) ->
-    amqp_channel:call(Channel, #'basic.publish'{ticket=Ticket, exchange= <<"amqpfs.announce">>}, {amqp_msg, #'P_basic'{}, term_to_binary({announce, file, {Path,on_demand}})}).
+file(Channel, Path) ->
+    amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs.announce">>}, {amqp_msg, #'P_basic'{}, term_to_binary({announce, file, {Path,on_demand}})}).
 
 
