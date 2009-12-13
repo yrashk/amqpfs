@@ -352,6 +352,9 @@ readdir_async(_Ctx, Ino, Size, Offset, _Fi, Cont, #amqpfs{}=State) ->
                                             case ets:lookup(State#amqpfs.names, Path2) of                      
                                                 [{Path2, {ChildIno, {directory, _Extra}}}] ->
                                                     {L ++ [#direntry{ name = P, offset = Acc, stat = ?DIRATTR(ChildIno)}], Acc + 1};
+                                                [{Path2, {ChildIno, {file, on_demand}}}] ->
+                                                    Stat = remote_getattr(Path, State),
+                                                    {L ++ [#direntry{ name = P, offset = Acc, stat = Stat#stat{ st_ino = ChildIno } }], Acc + 1};
                                                 [{Path2, {ChildIno, {file, _}}}] ->
                                                     {L ++ [#direntry{ name = P, offset = Acc, stat = 
                                                                       #stat{ st_ino = ChildIno, 
