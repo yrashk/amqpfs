@@ -158,7 +158,7 @@ getattr_async(_Ctx, Ino, Cont, State) ->
                     #fuse_reply_attr{ attr = #stat{ st_ino = Ino, st_size = 0, st_mode = ?S_IFREG bor 8#0444 }, attr_timeout_ms = 1000 };
                 [{Path, { Ino, {file, on_demand} } }] ->
                     case remote_getattr(Path, State) of
-                        #stat{}=Stat -> #fuse_reply_attr{ attr = Stat#stat{ st_ino = Ino }, attr_timeout_ms = 1000 };
+                        #stat{}=Stat -> #fuse_reply_attr{ attr = Stat#stat{ st_mode = ?S_IFREG bor 8#0444, st_ino = Ino }, attr_timeout_ms = 1000 };
                         Err -> #fuse_reply_err { err = Err}
                     end;
                 _ ->
@@ -226,7 +226,7 @@ lookup_impl(BinPath, Path, List, State) ->
                                                         generation = 1,  % (?)
                                                         attr_timeout_ms = 1000,
                                                         entry_timeout_ms = 1000,
-                                                        attr = Stat#stat{ st_ino = Ino } } };
+                                                        attr = Stat#stat{ st_mode = ?S_IFREG bor 8#0444, st_ino = Ino } } };
                 [{Path2, {Ino, {file, _}}}] ->
                     #fuse_reply_entry{ 
                   fuse_entry_param = #fuse_entry_param{ ino = Ino,
@@ -335,7 +335,7 @@ readdir_async(_Ctx, Ino, Size, Offset, _Fi, Cont, #amqpfs{}=State) ->
                                                     {L ++ [#direntry{ name = P, offset = Acc, stat = ?DIRATTR(ChildIno)}], Acc + 1};
                                                 [{Path2, {ChildIno, {file, on_demand}}}] ->
                                                     Stat = remote_getattr(Path2, State),
-                                                    {L ++ [#direntry{ name = P, offset = Acc, stat = Stat#stat{ st_ino = ChildIno } }], Acc + 1};
+                                                    {L ++ [#direntry{ name = P, offset = Acc, stat = Stat#stat{ st_mode = ?S_IFREG bor 8#0444, st_ino = ChildIno } }], Acc + 1};
                                                 [{Path2, {ChildIno, {file, _}}}] ->
                                                     {L ++ [#direntry{ name = P, offset = Acc, stat = 
                                                                       #stat{ st_ino = ChildIno, 
@@ -354,7 +354,7 @@ readdir_async(_Ctx, Ino, Size, Offset, _Fi, Cont, #amqpfs{}=State) ->
                                                     {L ++ [#direntry{ name = P, offset = Acc, stat = ?DIRATTR(ChildIno)}], Acc + 1};
                                                 [{Path2, {ChildIno, {file, on_demand}}}] ->
                                                     Stat = remote_getattr(Path2, State),
-                                                    {L ++ [#direntry{ name = P, offset = Acc, stat = Stat#stat{ st_ino = ChildIno } }], Acc + 1};
+                                                    {L ++ [#direntry{ name = P, offset = Acc, stat = Stat#stat{ st_mode = ?S_IFREG bor 8#0444, st_ino = ChildIno } }], Acc + 1};
                                                 [{Path2, {ChildIno, {file, _}}}] ->
                                                     {L ++ [#direntry{ name = P, offset = Acc, stat = 
                                                                       #stat{ st_ino = ChildIno, 

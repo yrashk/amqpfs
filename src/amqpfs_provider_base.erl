@@ -34,9 +34,15 @@ read(Path, Size, Offset, State) ->
 object(_Path, _State) ->
     <<>>.
 
-getattr(_,_State) ->
-    #stat{ st_mode = ?S_IFREG bor 8#0444, 
-           st_size = 0 }.
+getattr(Path,State) ->
+    Size = 
+    case amqpfs_provider:call_module(object, [Path, State], State) of
+        Datum when is_list(Datum) ->
+            length(Datum);
+        Datum when is_binary(Datum) ->
+            size(Datum)
+    end,
+    #stat{ st_size = Size }.
 
 allow_request(_State) ->
     true.

@@ -1,6 +1,6 @@
 -module(simple_amqpfs_provider). 
 
--export([init/1, list_dir/2, open/2, getattr/2, object/2]).
+-export([init/1, list_dir/2, open/2, object/2]).
 
 -include_lib("amqpfs/include/amqpfs.hrl").
 
@@ -25,12 +25,3 @@ open("/simple_on_demand/bogus", _State) ->
 
 object("/simple_on_demand/bogus", _State) ->
     ?BOGUS_CONTENT.
-
-
-getattr("/simple_on_demand/bogus", _State) ->
-    #stat{ st_mode = ?S_IFREG bor 8#0444, 
-           st_size = length(?BOGUS_CONTENT) };
-
-getattr(_,_State) ->
-    #stat{ st_mode = ?S_IFREG bor 8#0444, 
-           st_size = 0 }.

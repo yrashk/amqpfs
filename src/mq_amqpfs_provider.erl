@@ -21,8 +21,4 @@ open(_, _State) ->
 getattr("/mq/exchanges",_State) ->
     #stat{ st_mode = ?S_IFDIR bor 8#0555, 
            st_nlink = 1,
-           st_size = 0 };
-
-getattr(_,_State) ->
-    #stat{ st_mode = ?S_IFREG bor 8#0444, 
            st_size = 0 }.

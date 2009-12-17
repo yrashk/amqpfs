@@ -137,7 +137,7 @@ call_module(F, A, #amqpfs_provider_state{ module = Module }) ->
 
 call_module(F, A, Module) when is_atom(Module) ->
     case (catch apply(Module, F, A))  of
-        {'EXIT', {Reason, _}} when Reason == badarg; Reason == undef ->
+        {'EXIT', {Reason, _}} when Reason == badarg; Reason == undef; Reason == function_clause ->
             call_module(F, A, amqpfs_provider_base);
         Result ->
             Result
