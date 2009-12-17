@@ -1,6 +1,6 @@
 -module(mq_amqpfs_provider). 
 
--export([init/1, list_dir/2, open/2, read/4, getattr/2]).
+-export([init/1, list_dir/2, open/2, getattr/2]).
 
 -include_lib("amqpfs/include/amqpfs.hrl").
 
@@ -17,10 +17,6 @@ list_dir("/mq/exchanges", _State) ->
 open(_, _State) ->
     ok.
 
-
-
-read(_, _Size, _Offset, _State) ->
-    <<>>.
 
 getattr("/mq/exchanges",_State) ->
     #stat{ st_mode = ?S_IFDIR bor 8#0555, 
