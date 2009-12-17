@@ -1,12 +1,8 @@
 -module(simple_amqpfs_provider). 
--behaviour(amqpfs_provider).
 
--export([amqp_credentials/0, init/1, list_dir/2, open/2, read/4, getattr/2]).
+-export([init/1, list_dir/2, open/2, read/4, getattr/2]).
 
 -include_lib("amqpfs/include/amqpfs.hrl").
-
-amqp_credentials() ->
-    []. % default
 
 init(State) ->
     amqpfs_provider:announce(directory, "/simple", [], State),

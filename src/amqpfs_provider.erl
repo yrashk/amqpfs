@@ -13,12 +13,6 @@
 
 behaviour_info(callbacks) ->
     [ 
-      {amqp_credentials, 0},
-      {init, 1},
-      {list_dir, 2},
-      {open, 2},
-      {read, 4},
-      {getattr, 2}
      ].
 
 start(Module) ->
@@ -27,7 +21,7 @@ start(Module) ->
 init([Module]) ->
     State0 = #amqpfs_provider_state{ module = Module },
     State1 = setup(State0),
-    State2 = Module:init(State1),
+    State2 = call_module(init, [State1], State1),
     {ok, State2}.
 
 
@@ -41,7 +35,7 @@ handle_info(Msg, State) ->
     spawn(fun () -> handle_info_async(Msg, State) end),
     {noreply, State}.
 
-handle_info_async({#'basic.deliver'{consumer_tag=_ConsumerTag, delivery_tag=_DeliveryTag, redelivered=_Redelivered, exchange = <<"amqpfs">>, routing_key=_RoutingKey}, Content}, #amqpfs_provider_state{module = Module, channel = Channel} = State) ->
+handle_info_async({#'basic.deliver'{consumer_tag=_ConsumerTag, delivery_tag=_DeliveryTag, redelivered=_Redelivered, exchange = <<"amqpfs">>, routing_key=_RoutingKey}, Content}, #amqpfs_provider_state{channel = Channel} = State) ->
     #amqp_msg{payload = Payload } = Content,
     #'P_basic'{content_type = ContentType, headers = Headers, message_id = MessageId} = Content#amqp_msg.props,
     Command =
@@ -50,19 +44,19 @@ handle_info_async({#'basic.deliver'{consumer_tag=_ConsumerTag, delivery_tag=_Del
                 binary_to_term(Payload)
         end,
     ReqState = State#amqpfs_provider_state{ request_headers = Headers, request_command = Command },
-    case (catch Module:allow_request(ReqState)) of
+    case call_module(allow_request,[ReqState], ReqState) of
         false ->
             skip;
         _ ->
             case Command of
                 {list_dir, Path} ->
-                    spawn(fun () -> amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs.response">>}, {amqp_msg, #'P_basic'{reply_to = MessageId, content_type = ?CONTENT_TYPE_BERT }, term_to_binary(Module:list_dir(Path, ReqState))}) end);
+                    spawn(fun () -> amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs.response">>}, {amqp_msg, #'P_basic'{reply_to = MessageId, content_type = ?CONTENT_TYPE_BERT }, term_to_binary(call_module(list_dir,[Path, ReqState], ReqState))}) end);
                 {open, Path} ->
-                    spawn(fun () -> amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs.response">>}, {amqp_msg, #'P_basic'{reply_to = MessageId, content_type = ?CONTENT_TYPE_BERT }, term_to_binary(Module:open(Path, ReqState))}) end);
+                    spawn(fun () -> amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs.response">>}, {amqp_msg, #'P_basic'{reply_to = MessageId, content_type = ?CONTENT_TYPE_BERT }, term_to_binary(call_module(open, [Path, ReqState], ReqState))}) end);
                 {read, Path, Size, Offset} ->
                     spawn(fun () -> 
                                   {ResultContentType, Result} = 
-                                      case Module:read(Path, Size, Offset, ReqState) of
+                                      case call_module(read, [Path, Size, Offset, ReqState], ReqState) of
                                           Datum when is_binary(Datum) ->
                                               {?CONTENT_TYPE_BIN, Datum};
                                           Datum ->
@@ -71,7 +65,7 @@ handle_info_async({#'basic.deliver'{consumer_tag=_ConsumerTag, delivery_tag=_Del
                                   amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs.response">>}, {amqp_msg, #'P_basic'{reply_to = MessageId, content_type = ResultContentType}, Result}) 
                           end);
                 {getattr, Path} ->
-                    spawn(fun () -> amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs.response">>}, {amqp_msg, #'P_basic'{reply_to = MessageId, content_type = ?CONTENT_TYPE_BERT}, term_to_binary(Module:getattr(Path, ReqState))}) end);
+                    spawn(fun () -> amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs.response">>}, {amqp_msg, #'P_basic'{reply_to = MessageId, content_type = ?CONTENT_TYPE_BERT}, term_to_binary(call_module(getattr, [Path, ReqState], ReqState))}) end);
                 Other ->
                     io:format("Unknown request ~p~n",[Other])
             end
@@ -101,7 +95,7 @@ announce(file, Name, #amqpfs_provider_state{ channel = Channel} = State) ->
 %%%% 
 
 setup(#amqpfs_provider_state{ module = Module }=State) ->
-    Credentials = Module:amqp_credentials(),
+    Credentials = call_module(amqp_credentials, [], State),
     {ok, Connection} = erabbitmq_connections:start(#amqp_params{username = list_to_binary(proplists:get_value(username, Credentials, "guest")),
                                                                 password = list_to_binary(proplists:get_value(password, Credentials, "guest")),
                                                                 virtual_host = list_to_binary(proplists:get_value(virtual_host, Credentials, "/")),
@@ -133,3 +127,16 @@ setup_listener(Name, #amqpfs_provider_state{ module = Module, channel = Channel}
           #'basic.consume_ok'{consumer_tag = ConsumerTag} -> ok
     end.
 
+
+%%%
+
+call_module(F, A, #amqpfs_provider_state{ module = Module }) ->
+    call_module(F, A, Module);
+
+call_module(F, A, Module) when is_atom(Module) ->
+    case (catch apply(Module, F, A))  of
+        {'EXIT', {Reason, _}} when Reason == badarg; Reason == undef ->
+            call_module(F, A, amqpfs_provider_base);
+        Result ->
+            Result
+    end.
