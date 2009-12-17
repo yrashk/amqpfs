@@ -5,10 +5,12 @@
 -include_lib("amqpfs/include/amqpfs.hrl").
 
 init(State) ->
-    amqpfs_provider:announce(directory, "/mq", [], State),
-    amqpfs_provider:announce(directory, "/mq/exchanges", State),
+    amqpfs_provider:announce(directory, "/mq", State),
     State.
 
+
+list_dir("/mq", _State) ->
+    [{"exchanges", {directory, on_demand}}];
 
 list_dir("/mq/exchanges", _State) ->
     Exchanges = rpc:call('rabbit@hq', rabbit_exchange, info_all, [<<"/">>,[name]]),

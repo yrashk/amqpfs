@@ -5,13 +5,13 @@
 -include_lib("amqpfs/include/amqpfs.hrl").
 
 init(State) ->
-    amqpfs_provider:announce(directory, "/simple", [], State),
+    amqpfs_provider:announce(directory, "/simple", State),
     amqpfs_provider:announce(directory, "/simple_on_demand", State),
-    amqpfs_provider:announce(file, "/just_a_file", State),
-    amqpfs_provider:announce(file, "/simple/file1", State),
-    amqpfs_provider:announce(file, "/simple/file2", State),
     State.
 
+
+list_dir("/simple", _State) ->
+    [{"file1", {file, on_demand}}, {"file2", {file, on_demand}}];
 
 list_dir("/simple_on_demand", State) ->
     {value, {_, _, Node }} = lists:keysearch(<<"node">>,1,State#amqpfs_provider_state.request_headers),

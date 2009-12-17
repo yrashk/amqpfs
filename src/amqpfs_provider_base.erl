@@ -2,6 +2,7 @@
 
 -export([amqp_credentials/0, init/1, list_dir/2, open/2, read/4, getattr/2,
          object/2, size/2,
+         handle_info/2,
          allow_request/1]).
 
 -include_lib("amqpfs/include/amqpfs.hrl").
@@ -45,6 +46,9 @@ size(Path, State) ->
 getattr(Path,State) ->
     Size = amqpfs_provider:call_module(size, [Path, State], State),
     #stat{ st_size = Size }.
+
+handle_info(_Msg, _State) ->
+    ignore.
 
 allow_request(_State) ->
     true.

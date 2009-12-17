@@ -1,5 +1,6 @@
 -module(amqpfs_util).
--export([path_to_matching_routing_key/1,path_to_routing_key/1, setup/1, setup_provider_queue/2, provider_queue_name/1, announce_queue_name/0, announce_queue_name/1, response_queue_name/0, response_queue_name/1]).
+-export([path_to_matching_routing_key/1,path_to_routing_key/1, setup/1, setup_provider_queue/2, provider_queue_name/1, announce_queue_name/0, announce_queue_name/1, announce_queue_name/2, response_queue_name/0, response_queue_name/1,
+        decode_payload/2]).
 
 -include_lib("amqpfs/include/amqpfs.hrl").
 
@@ -34,8 +35,14 @@ setup_provider_queue(Channel, Name) ->
 announce_queue_name() ->
     announce_queue_name(node()).
 
-announce_queue_name(Node) ->
-    list_to_binary("amqpfs.announce:" ++ atom_to_list(Node)).
+announce_queue_name(Prefix) when is_list(Prefix) ->
+    announce_queue_name(Prefix, node());
+
+announce_queue_name(Node) when is_atom(Node) ->
+    announce_queue_name("",node()).
+   
+announce_queue_name(Prefix, Node) ->
+    list_to_binary("amqpfs.announce:" ++ Prefix ++ "/" ++ atom_to_list(Node)).
 
 response_queue_name() ->
     response_queue_name(node()).
@@ -47,8 +54,14 @@ provider_queue_name(Name) ->
     list_to_binary(term_to_string(Name) ++ ":" ++ atom_to_list(node())).
     
 
+path_to_matching_routing_key("/") ->
+   <<"ROOT">>;
+
 path_to_matching_routing_key(Path) ->
     list_to_binary(string:join(lists:map(fun base64:encode_to_string/1, string:tokens(Path,"/")),".") ++ [".#"]).
+
+path_to_routing_key("/") ->
+    <<"ROOT">>;
 
 path_to_routing_key(Path) ->
     list_to_binary(string:join(lists:map(fun base64:encode_to_string/1, string:tokens(Path,"/")),".")).
@@ -59,3 +72,13 @@ term_to_string(T) when is_atom(T) ->
     atom_to_list(T);
 term_to_string(T) when is_binary(T) ->
     binary_to_list(T).
+
+decode_payload(ContentType, Payload) ->    
+    case ContentType of
+        ?CONTENT_TYPE_BERT ->
+            binary_to_term(Payload);
+        ?CONTENT_TYPE_BIN ->
+            Payload;
+        _ ->
+            binary_to_term(Payload) % by default, attempt BERT, but FIXME: it might be a bad idea in a long run
+    end.

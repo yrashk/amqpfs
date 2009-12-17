@@ -1,6 +1,7 @@
 -module(dot_amqpfs_provider). 
 
 -export([init/1, 
+         list_dir/2,
          open/2,
          object/2,
          allow_request/1]).
@@ -8,9 +9,11 @@
 -include_lib("amqpfs/include/amqpfs.hrl").
 
 init(State) ->
-    amqpfs_provider:announce(directory, "/.amqpfs", [], State),
-    amqpfs_provider:announce(file, "/.amqpfs/version", State),
+    amqpfs_provider:announce(directory, "/.amqpfs", State),
     State.
+
+list_dir("/.amqpfs", _State) ->
+    [{"version", {file, on_demand}}].
 
 open("/.amqpfs/version", _State) ->
     ok.

@@ -12,5 +12,6 @@
           connection,
           channel,
           request_headers,
-          request_command
+          request_command,
+          extra
          }).

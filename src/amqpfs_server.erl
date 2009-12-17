@@ -83,7 +83,7 @@ init ([]) ->
           #'basic.consume_ok'{consumer_tag = ResponseConsumerTag} -> ok
     end,
 
-    State0 = #amqpfs{ inodes = ets:new(inodes, [public, ordered_set]),
+    State = #amqpfs{ inodes = ets:new(inodes, [public, ordered_set]),
                       names = ets:new(names, [public, set]),
                       response_routes = ets:new(response_routes, [public, set]),
                       amqp_conn = AmqpConn,
@@ -91,7 +91,6 @@ init ([]) ->
                       amqp_consumer_tag = ConsumerTag,
                       amqp_response_consumer_tag = ResponseConsumerTag
                   },
-    {_, State} = make_inode("/", {directory, []}, State0),
     { ok, State }.
 
 code_change (_OldVsn, State, _Extra) -> { ok, State }.
@@ -99,7 +98,7 @@ code_change (_OldVsn, State, _Extra) -> { ok, State }.
 handle_info({#'basic.deliver'{consumer_tag=ConsumerTag, delivery_tag=_DeliveryTag, redelivered=_Redelivered, exchange = <<"amqpfs.response">>, routing_key=_RoutingKey}, Content} , #amqpfs{response_routes = Tab, amqp_response_consumer_tag = ConsumerTag}=State) ->
     #amqp_msg{payload = Payload } = Content,
     #'P_basic'{content_type = ContentType, headers = _Headers, reply_to = Route} = Content#amqp_msg.props,
-    Response = decode_payload(ContentType, Payload),
+    Response = amqpfs_util:decode_payload(ContentType, Payload),
     case ets:lookup(Tab, Route) of 
         [{Route, Pid}] ->
             Pid ! {response, Response};
@@ -111,7 +110,7 @@ handle_info({#'basic.deliver'{consumer_tag=ConsumerTag, delivery_tag=_DeliveryTa
 handle_info({#'basic.deliver'{consumer_tag=ConsumerTag, delivery_tag=_DeliveryTag, redelivered=_Redelivered, exchange = <<"amqpfs.announce">>, routing_key=_RoutingKey}, Content} , #amqpfs{amqp_consumer_tag = ConsumerTag}=State) ->
     #amqp_msg{payload = Payload } = Content,
     #'P_basic'{content_type = ContentType, headers = _Headers} = Content#amqp_msg.props,
-    Command = decode_payload(ContentType, Payload),
+    Command = amqpfs_util:decode_payload(ContentType, Payload),
     {noreply, handle_command(Command, State)};
 
 handle_info (_Msg, State) -> { noreply, State }.
@@ -124,19 +123,10 @@ terminate (_Reason, _State) -> ok.
 
 
 handle_command({announce, directory, {Path, Contents}}, State) ->
-    {_, State1} = ensure_path(Path, {directory, Contents}, State),
-    {_, State2} = make_inode(Path, {directory, Contents}, State1),
-    State2;
-
-handle_command({announce, file, {Path, Extra}}, State) ->
-    {_, State2} = make_inode(Path, {file, Extra}, State),
-    State3 = add_item(filename:dirname(Path),filename:basename(Path), State2),
-    State3;
+    {_, State1} = make_inode(Path, {directory, Contents}, State),
+    State1;
 
 handle_command({cancel, directory, _Path}, State) ->
-    State;
-
-handle_command({cancel, file, _Path}, State) ->
     State.
 
 getattr(Ctx, Ino, Cont, State) ->
@@ -152,10 +142,8 @@ getattr_async(_Ctx, Ino, Cont, State) ->
     case ets:lookup(State#amqpfs.inodes, Ino) of
         [{Ino, Path}] ->
             case ets:lookup(State#amqpfs.names, Path) of
-                [{Path, { Ino, {directory, _List} } }] ->
+                [{Path, { Ino, {directory, _} } }] ->
                     #fuse_reply_attr{ attr = ?DIRATTR (Ino), attr_timeout_ms = 1000 };
-                [{Path, { Ino, {file, undefined} } }] ->
-                    #fuse_reply_attr{ attr = #stat{ st_ino = Ino, st_size = 0, st_mode = ?S_IFREG bor 8#0444 }, attr_timeout_ms = 1000 };
                 [{Path, { Ino, {file, on_demand} } }] ->
                     case remote_getattr(Path, State) of
                         #stat{}=Stat -> #fuse_reply_attr{ attr = Stat#stat{ st_mode = ?S_IFREG bor 8#0444, st_ino = Ino }, attr_timeout_ms = 1000 };
@@ -189,8 +177,6 @@ lookup_async(_Ctx, ParentIno, BinPath, Cont, State) ->
                     end,
             Result =
             case ets:lookup(State#amqpfs.names, Path) of
-                [{Path, { ParentIno, {directory, List} } }] when is_list(List) ->
-                    lookup_impl(BinPath, Path1, List, State);
                 [{Path, { ParentIno, {directory, on_demand}}}] ->
                     Response = directory_on_demand(Path, State),
                     List = lists:map(fun ({P,E}) -> 
@@ -212,7 +198,7 @@ lookup_impl(BinPath, Path, List, State) ->
         true -> % there is something
             Path2 = Path ++ "/" ++ binary_to_list(BinPath),
             case ets:lookup(State#amqpfs.names, Path2) of
-                [{Path2, {Ino, {directory, _List}}}] ->
+                [{Path2, {Ino, {directory, _}}}] ->
                     #fuse_reply_entry{ 
                   fuse_entry_param = #fuse_entry_param{ ino = Ino,
                                                         generation = 1,  % (?)
@@ -227,15 +213,6 @@ lookup_impl(BinPath, Path, List, State) ->
                                                         attr_timeout_ms = 1000,
                                                         entry_timeout_ms = 1000,
                                                         attr = Stat#stat{ st_mode = ?S_IFREG bor 8#0444, st_ino = Ino } } };
-                [{Path2, {Ino, {file, _}}}] ->
-                    #fuse_reply_entry{ 
-                  fuse_entry_param = #fuse_entry_param{ ino = Ino,
-                                                        generation = 1,  % (?)
-                                                        attr_timeout_ms = 1000,
-                                                        entry_timeout_ms = 1000,
-                                                        attr = #stat{ st_ino = Ino, 
-                                                                      st_mode = ?S_IFREG bor 8#0444, 
-                                                                      st_size = 0 } } };
                 _ ->
                     #fuse_reply_err{ err = enoent }
             end;
@@ -327,7 +304,7 @@ readdir_async(_Ctx, Ino, Size, Offset, _Fi, Cont, #amqpfs{}=State) ->
                 case ets:lookup(State#amqpfs.names, Path) of
                     [{Path, { Ino, {directory, on_demand}}}] ->
                         Response = directory_on_demand(Path, State),
-                        lists:foldl(fun ({P, E}, {L, Acc}) -> % it is a copy paste of the stuff below
+                        lists:foldl(fun ({P, E}, {L, Acc}) -> 
                                             Path2 = Path1 ++ "/" ++ P,
                                             make_inode(Path2, E, State),
                                             case ets:lookup(State#amqpfs.names, Path2) of                      
@@ -346,25 +323,6 @@ readdir_async(_Ctx, Ino, Size, Offset, _Fi, Cont, #amqpfs{}=State) ->
                                                     {L, Acc}
                                             end
                                     end, {[],3},  Response);
-                    [{Path, { Ino, {directory, List } }}] when is_list(List) ->
-                        lists:foldl(fun (P, {L, Acc}) ->
-                                            Path2 = Path1 ++ "/" ++ P,
-                                            case ets:lookup(State#amqpfs.names, Path2) of                      
-                                                [{Path2, {ChildIno, {directory, _Extra}}}] ->
-                                                    {L ++ [#direntry{ name = P, offset = Acc, stat = ?DIRATTR(ChildIno)}], Acc + 1};
-                                                [{Path2, {ChildIno, {file, on_demand}}}] ->
-                                                    Stat = remote_getattr(Path2, State),
-                                                    {L ++ [#direntry{ name = P, offset = Acc, stat = Stat#stat{ st_mode = ?S_IFREG bor 8#0444, st_ino = ChildIno } }], Acc + 1};
-                                                [{Path2, {ChildIno, {file, _}}}] ->
-                                                    {L ++ [#direntry{ name = P, offset = Acc, stat = 
-                                                                      #stat{ st_ino = ChildIno, 
-                                                                             st_mode = ?S_IFREG bor 8#0444, 
-                                                                             st_size = 0 }
-                                                                     }], Acc + 1};
-                                                _ ->
-                                                    {L, Acc}
-                                            end
-                                    end, {[],3},  List);
                     _ ->
                         {[], 3}
                 end;
@@ -416,32 +374,7 @@ make_inode (Name,Extra, State) ->
           { Id, State }
   end.
 
-ensure_path("/", State) ->
-    make_inode("/", undefined, State);
-ensure_path(Path, State0) ->
-    ensure_path(Path, {directory, []}, State0).
 
-ensure_path(Path, Extra, State0) ->
-    Dir = filename:dirname(Path),
-    Base = filename:basename(Path),
-    {_, State1} = make_inode(Path, Extra, State0),
-    {Ino, State2} = ensure_path(Dir, State1),
-    State3 = add_item(Dir, Base, State2),
-    {Ino, State3}.
-
-add_item(Path, Item, State) ->    
-        case ets:lookup(State#amqpfs.names, Path) of
-            [{Path, {Ino, {directory, List}}}] ->
-                case lists:any(fun (I) -> I == Item end, List) of
-                    false ->
-                        ets:insert(State#amqpfs.names, {Path, {Ino, {directory, List ++ [Item]}}});
-                    _ ->
-                        skip
-                end;
-        _ ->
-            skip
-    end,
-    State.
 
 register_response_route(#amqpfs{response_routes=Tab}) ->
     Route = list_to_binary(lists:flatten(io_lib:format("~w",[now()]))),
@@ -475,17 +408,7 @@ remote_getattr(Path, #amqpfs{amqp_channel = Channel}=State) ->
     unregister_response_route(Route, State),
     Response.
 
-    
-decode_payload(ContentType, Payload) ->    
-    case ContentType of
-        ?CONTENT_TYPE_BERT ->
-            binary_to_term(Payload);
-        ?CONTENT_TYPE_BIN ->
-            Payload;
-        _ ->
-            binary_to_term(Payload) % by default, attempt BERT, but FIXME: it might be a bad idea in a long run
-    end.
-    
+       
 env_headers(_State) ->
     {ok, Hostname} = inet:gethostname(),
     [{"node", longstr, atom_to_list(node())},

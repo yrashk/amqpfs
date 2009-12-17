@@ -9,7 +9,7 @@
 
 -export([call_module/3]).
 
--export([announce/3, announce/4]).
+-export([announce/3]).
 
 -include_lib("amqpfs/include/amqpfs.hrl").
 
@@ -69,11 +69,12 @@ handle_info_async({#'basic.deliver'{consumer_tag=_ConsumerTag, delivery_tag=_Del
                 {getattr, Path} ->
                     spawn(fun () -> amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs.response">>}, {amqp_msg, #'P_basic'{reply_to = MessageId, content_type = ?CONTENT_TYPE_BERT}, term_to_binary(call_module(getattr, [Path, ReqState], ReqState))}) end);
                 Other ->
-                    io:format("Unknown request ~p~n",[Other])
+                    ignore
             end
     end;
-handle_info_async(_, _State) ->
-    ok.
+
+handle_info_async(Msg, State) ->
+    spawn(fun () -> call_module(handle_info, [Msg, State], State) end).
 
 code_change(_OldVsn, State, _Extra) ->
     State.
@@ -82,17 +83,9 @@ terminate(_Reason, _State) ->
     ok.
 %%%%
 
-announce(directory, Name, Contents, #amqpfs_provider_state{ channel = Channel} = State) ->
-    setup_listener(Name, State),
-    amqpfs_announce:directory(Channel, Name, Contents).
-
 announce(directory, Name, #amqpfs_provider_state{ channel = Channel } = State) ->
     setup_listener(Name, State),
-    amqpfs_announce:directory(Channel, Name);
-
-announce(file, Name, #amqpfs_provider_state{ channel = Channel} = State) ->
-    setup_listener(Name, State),
-    amqpfs_announce:file(Channel, Name).
+    amqpfs_announce:directory(Channel, Name).
 
 %%%% 
 
