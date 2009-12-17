@@ -334,7 +334,7 @@ readdir_async(_Ctx, Ino, Size, Offset, _Fi, Cont, #amqpfs{}=State) ->
                                                 [{Path2, {ChildIno, {directory, _Extra}}}] ->
                                                     {L ++ [#direntry{ name = P, offset = Acc, stat = ?DIRATTR(ChildIno)}], Acc + 1};
                                                 [{Path2, {ChildIno, {file, on_demand}}}] ->
-                                                    Stat = remote_getattr(Path, State),
+                                                    Stat = remote_getattr(Path2, State),
                                                     {L ++ [#direntry{ name = P, offset = Acc, stat = Stat#stat{ st_ino = ChildIno } }], Acc + 1};
                                                 [{Path2, {ChildIno, {file, _}}}] ->
                                                     {L ++ [#direntry{ name = P, offset = Acc, stat = 
@@ -353,7 +353,7 @@ readdir_async(_Ctx, Ino, Size, Offset, _Fi, Cont, #amqpfs{}=State) ->
                                                 [{Path2, {ChildIno, {directory, _Extra}}}] ->
                                                     {L ++ [#direntry{ name = P, offset = Acc, stat = ?DIRATTR(ChildIno)}], Acc + 1};
                                                 [{Path2, {ChildIno, {file, on_demand}}}] ->
-                                                    Stat = remote_getattr(Path, State),
+                                                    Stat = remote_getattr(Path2, State),
                                                     {L ++ [#direntry{ name = P, offset = Acc, stat = Stat#stat{ st_ino = ChildIno } }], Acc + 1};
                                                 [{Path2, {ChildIno, {file, _}}}] ->
                                                     {L ++ [#direntry{ name = P, offset = Acc, stat = 
