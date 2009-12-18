@@ -66,9 +66,13 @@ handle_info_async({#'basic.deliver'{consumer_tag=_ConsumerTag, delivery_tag=_Del
                                       end,
                                   amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs.response">>}, {amqp_msg, #'P_basic'{reply_to = MessageId, content_type = ResultContentType}, Result}) 
                           end);
+                {write, Path, Data, Offset} ->
+                    spawn(fun () -> amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs.response">>}, {amqp_msg, #'P_basic'{reply_to = MessageId, content_type = ?CONTENT_TYPE_BERT }, term_to_binary(call_module(write, [Path, Data, Offset, ReqState], ReqState))}) end);
                 {getattr, Path} ->
                     spawn(fun () -> amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs.response">>}, {amqp_msg, #'P_basic'{reply_to = MessageId, content_type = ?CONTENT_TYPE_BERT}, term_to_binary(call_module(getattr, [Path, ReqState], ReqState))}) end);
-                Other ->
+                {setattr, Path, Attr} ->
+                    spawn(fun () -> amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs.response">>}, {amqp_msg, #'P_basic'{reply_to = MessageId, content_type = ?CONTENT_TYPE_BERT}, term_to_binary(call_module(setattr, [Path, Attr, ReqState], ReqState))}) end);
+                _ ->
                     ignore
             end
     end;

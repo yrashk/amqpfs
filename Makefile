@@ -1,7 +1,7 @@
 all: main
 
 main: submodules
-	erl -pa ebin -make
+	erl -pa ebin vendor/fuserl/fuserl/src -make
 
 submodules: erabbitmq fuserl fuserldrv
 

@@ -1,7 +1,8 @@
 -module(amqpfs_provider_base).
 
--export([amqp_credentials/0, init/1, list_dir/2, open/2, read/4, getattr/2,
+-export([amqp_credentials/0, init/1, list_dir/2, open/2, read/4, getattr/2, setattr/3,
          object/2, size/2,
+         write/4,
          handle_info/2,
          allow_request/1]).
 
@@ -32,6 +33,9 @@ read(Path, Size, Offset, State) ->
     {Result2, _} = split_binary(Result1, Size),
     Result2.
 
+write(_Path, _Data, _Offset, _State) ->
+    eio.
+
 object(_Path, _State) ->
     <<>>.
 
@@ -42,6 +46,9 @@ size(Path, State) ->
         Datum when is_binary(Datum) ->
             size(Datum)
     end.
+
+setattr(_Path, Attr, _State) ->
+    Attr.
 
 getattr(Path,State) ->
     Size = amqpfs_provider:call_module(size, [Path, State], State),
