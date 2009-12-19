@@ -174,7 +174,7 @@ getattr_async(_Ctx, Ino, Cont, State) ->
                     #fuse_reply_attr{ attr = ?DIRATTR (Ino), attr_timeout_ms = 1000 };
                 [{Path, { Ino, {file, on_demand} } }] ->
                     case remote_getattr(Path, State) of
-                        #stat{}=Stat -> #fuse_reply_attr{ attr = Stat#stat{ st_mode = ?S_IFREG bor 8#0666, st_ino = Ino }, attr_timeout_ms = 1000 };
+                        #stat{}=Stat -> #fuse_reply_attr{ attr = Stat, attr_timeout_ms = 1000 };
                         Err -> #fuse_reply_err { err = Err}
                     end;
                 _ ->
@@ -226,21 +226,14 @@ lookup_impl(BinPath, Path, List, State) ->
         true -> % there is something
             Path2 = Path ++ "/" ++ binary_to_list(BinPath),
             case ets:lookup(State#amqpfs.names, Path2) of
-                [{Path2, {Ino, {directory, _}}}] ->
-                    #fuse_reply_entry{ 
-                  fuse_entry_param = #fuse_entry_param{ ino = Ino,
-                                                        generation = 1,  % (?)
-                                                        attr_timeout_ms = 1000,
-                                                        entry_timeout_ms = 1000,
-                                                        attr = ?DIRATTR (Ino) } };
-                [{Path2, {Ino, {file, on_demand}}}] ->
+                [{Path2, {Ino, _}}] ->
                     Stat = remote_getattr(Path2, State),
                     #fuse_reply_entry{ 
-                  fuse_entry_param = #fuse_entry_param{ ino = Ino,
-                                                        generation = 1,  % (?)
-                                                        attr_timeout_ms = 1000,
-                                                        entry_timeout_ms = 1000,
-                                                        attr = Stat#stat{ st_mode = ?S_IFREG bor 8#0666, st_ino = Ino } } };
+                                       fuse_entry_param = #fuse_entry_param{ ino = Ino,
+                                                                             generation = 1,  % (?)
+                                                                             attr_timeout_ms = 1000,
+                                                                             entry_timeout_ms = 1000,
+                                                                             attr = Stat } };
                 _ ->
                     #fuse_reply_err{ err = enoent }
             end;
@@ -328,7 +321,7 @@ readdir_async(_Ctx, Ino, Size, Offset, _Fi, Cont, #amqpfs{}=State) ->
                                                     {L ++ [#direntry{ name = P, offset = Acc, stat = ?DIRATTR(ChildIno)}], Acc + 1};
                                                 [{Path2, {ChildIno, {file, on_demand}}}] ->
                                                     Stat = remote_getattr(Path2, State),
-                                                    {L ++ [#direntry{ name = P, offset = Acc, stat = Stat#stat{ st_mode = ?S_IFREG bor 8#0666, st_ino = ChildIno } }], Acc + 1};
+                                                    {L ++ [#direntry{ name = P, offset = Acc, stat = Stat }], Acc + 1};
                                                 _ ->
                                                     {L, Acc}
                                             end
@@ -576,9 +569,8 @@ setattr_async(Ctx, Ino, Attr, ToSet, Fi, Cont, State) ->
         [{Ino,Path}] ->
             case remote_getattr(Path, State) of
                 #stat{}=Stat -> 
-                    Stat0 = Stat#stat{ st_ino = Ino, st_mode = ?S_IFREG bor 8#0666 },
-                    Stat1 = remote_setattr(Path, setattr_stat(Stat0, Attr, ToSet), State),
-                    #fuse_reply_attr{ attr = Stat1#stat{ st_ino = Ino } , attr_timeout_ms = 1000 };
+                    Stat1 = remote_setattr(Path, setattr_stat(Stat, Attr, ToSet), State),
+                    #fuse_reply_attr{ attr = Stat1 , attr_timeout_ms = 1000 };
                 Err -> #fuse_reply_err { err = Err}
             end;
         [] ->
@@ -645,7 +637,15 @@ directory_on_demand(Path, State) ->
     remote(Path, {list_dir, Path}, State).
 
 remote_getattr(Path, State) ->
-    remote(Path, {getattr, Path}, State).
+    Stat0 = remote(Path, {getattr, Path}, State),
+    case ets:lookup (State#amqpfs.names, Path) of
+        [{Path, {Ino, {directory, on_demand}}}] ->
+            Stat0#stat{ st_mode = ?S_IFDIR bor 8#0555, st_ino = Ino, st_nlink = 1}; % FIXME: is st_nlink always going to be 1?
+        [{Path, {Ino, {file, on_demand}}}] ->
+            Stat0#stat{ st_mode = ?S_IFREG bor 8#0666, st_ino = Ino };
+        [] ->
+            Stat0
+    end.
 
 remote_setattr(Path, Attr, State) ->
     remote(Path, {setattr, Path, Attr}, State).
