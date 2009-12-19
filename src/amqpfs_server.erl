@@ -261,15 +261,7 @@ open_async(_Ctx, Ino, Fi, Cont, #amqpfs{amqp_channel = Channel}=State) ->
     Result =
     case ets:lookup(State#amqpfs.inodes, Ino) of
         [{Ino,Path}] ->
-            Route = register_response_route(State),
-            amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs">>, routing_key = amqpfs_util:path_to_routing_key(Path)}, {amqp_msg, #'P_basic'{message_id = Route, headers = env_headers(State)}, term_to_binary({open, Path, Fi})}),
-            Response = 
-                receive 
-                    {response, Data} -> Data
-                after ?ON_DEMAND_TIMEOUT ->
-                        []
-                end,
-            unregister_response_route(Route, State),
+            Response = remote(Path, {open, Path, Fi}, State),
             case Response of
                 ok -> #fuse_reply_open{fuse_file_info = Fi};
                 enoent -> #fuse_reply_err { err = enoent};
@@ -295,15 +287,7 @@ read_async(_Ctx, Ino, Size, Offset, _Fi, Cont,  #amqpfs{amqp_channel = Channel}=
     Result =
     case ets:lookup(State#amqpfs.inodes, Ino) of
         [{Ino,Path}] ->
-            Route = register_response_route(State),
-            amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs">>, routing_key = amqpfs_util:path_to_routing_key(Path)}, {amqp_msg, #'P_basic'{message_id = Route, headers = env_headers(State)}, term_to_binary({read, Path, Size, Offset})}),
-            Response = 
-                receive 
-                    {response, Data} -> Data
-                after ?ON_DEMAND_TIMEOUT ->
-                        []
-                end,
-            unregister_response_route(Route, State),
+            Response = remote(Path, {read, Path, Size, Offset}, State),
             case Response of
                 Buf when is_binary(Buf), size(Buf) =< Size -> #fuse_reply_buf{ size = size(Buf), buf = Buf };
                 eio -> #fuse_reply_err { err = eio};
@@ -392,15 +376,7 @@ write_async(_Ctx, Ino, Data, Offset, _Fi, Cont, #amqpfs{amqp_channel = Channel}=
     Result =
     case ets:lookup(State#amqpfs.inodes, Ino) of
         [{Ino,Path}] ->
-            Route = register_response_route(State),
-            amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs">>, routing_key = amqpfs_util:path_to_routing_key(Path)}, {amqp_msg, #'P_basic'{message_id = Route, headers = env_headers(State)}, term_to_binary({write, Path, Data, Offset})}),
-            Response = 
-                receive 
-                    {response, Data} -> Data
-                after ?ON_DEMAND_TIMEOUT ->
-                        []
-                end,
-            unregister_response_route(Route, State),
+            Response = remote(Path, {write, Path, Data, Offset}, State),
             case Response of
                 Count when is_integer(Count) -> #fuse_reply_write{ count = Count };
                 eio -> #fuse_reply_err { err = eio};
@@ -665,39 +641,24 @@ register_response_route(#amqpfs{response_routes=Tab}) ->
 unregister_response_route(Route, #amqpfs{response_routes=Tab}) ->
     ets:delete(Tab, Route).
             
-directory_on_demand(Path, #amqpfs{amqp_channel = Channel}=State) ->
+directory_on_demand(Path, State) ->
+    remote(Path, {list_dir, Path}, State).
+
+remote_getattr(Path, State) ->
+    remote(Path, {getattr, Path}, State).
+
+remote_setattr(Path, Attr, State) ->
+    remote(Path, {setattr, Path, Attr}, State).
+
+remote(Path, Command, #amqpfs{amqp_channel = Channel}=State) ->
     Route = register_response_route(State),
-    amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs">>, routing_key = amqpfs_util:path_to_routing_key(Path)}, {amqp_msg, #'P_basic'{message_id = Route, headers = env_headers(State)}, term_to_binary({list_dir, Path})}),
+    amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs">>, routing_key = amqpfs_util:path_to_routing_key(Path)}, {amqp_msg, #'P_basic'{message_id = Route, headers = env_headers(State)}, term_to_binary(Command)}),
     Response = 
         receive 
             {response, Data} -> Data
         after ?ON_DEMAND_TIMEOUT ->
                 []
         end,
-    unregister_response_route(Route, State),        
-    Response.
-
-remote_getattr(Path, #amqpfs{amqp_channel = Channel}=State) ->
-    Route = register_response_route(State),
-    amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs">>, routing_key = amqpfs_util:path_to_routing_key(Path)}, {amqp_msg, #'P_basic'{message_id = Route, headers = env_headers(State)}, term_to_binary({getattr, Path})}),
-    Response = 
-        receive 
-            {response, Data} -> Data
-                        after ?ON_DEMAND_TIMEOUT ->
-                                []
-                        end,
-    unregister_response_route(Route, State),
-    Response.
-
-remote_setattr(Path, Attr, #amqpfs{amqp_channel = Channel}=State) ->
-    Route = register_response_route(State),
-    amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs">>, routing_key = amqpfs_util:path_to_routing_key(Path)}, {amqp_msg, #'P_basic'{message_id = Route, headers = env_headers(State)}, term_to_binary({setattr, Path, Attr})}),
-    Response = 
-        receive 
-            {response, Data} -> Data
-                        after ?ON_DEMAND_TIMEOUT ->
-                                []
-                        end,
     unregister_response_route(Route, State),
     Response.
 
