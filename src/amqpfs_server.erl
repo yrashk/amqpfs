@@ -460,7 +460,6 @@ mknod_async(Ctx, _ParentIno, _Name, Mode, _Dev, Cont, _State) ->
     fuserlsrv:reply(Cont, #fuse_reply_entry{ fuse_entry_param = Param }).
 
 create(Ctx, ParentIno, Name, Mode, Fi, Cont, State) ->
-    io:format("create ~p Mode ~p~n", [Name, Mode]),
     spawn_link 
       (fun () -> 
                create_async(Ctx, ParentIno, Name, Mode, Fi, Cont, State)
