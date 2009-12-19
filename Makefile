@@ -8,7 +8,9 @@ submodules: erabbitmq fuserl fuserldrv
 erabbitmq: rabbitmq-erlang-client
 	cd vendor/erabbitmq ; $(MAKE)
 
-rabbitmq-erlang-client: $(dir vendor/rabbitmq-erlang-client)
+rabbitmq-erlang-client: vendor/rabbitmq-erlang-client/dist/amqp_client.ez
+
+vendor/rabbitmq-erlang-client/dist/amqp_client.ez: $(dir vendor/rabbitmq-erlang-client/src)
 	cd vendor/rabbitmq-codegen ; $(MAKE)
 	cd vendor/rabbitmq-server ; $(MAKE)
 	cd vendor/rabbitmq-erlang-client ; $(MAKE)
