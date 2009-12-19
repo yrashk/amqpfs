@@ -250,7 +250,7 @@ opendir(Ctx, Ino, Fi, Cont, State) ->
   spawn_link (fun () -> open_async(Ctx, Ino, Fi, Cont, State) end),
   { noreply, State }.
 
-open_async(_Ctx, Ino, Fi, Cont, #amqpfs{amqp_channel = Channel}=State) ->
+open_async(_Ctx, Ino, Fi, Cont, State) ->
     Result =
     case ets:lookup(State#amqpfs.inodes, Ino) of
         [{Ino,Path}] ->
@@ -276,7 +276,7 @@ read(Ctx, Ino, Size, Offset, Fi, Cont, State) ->
                end),
     { noreply, State }.
 
-read_async(_Ctx, Ino, Size, Offset, _Fi, Cont,  #amqpfs{amqp_channel = Channel}=State) ->
+read_async(_Ctx, Ino, Size, Offset, _Fi, Cont, State) ->
     Result =
     case ets:lookup(State#amqpfs.inodes, Ino) of
         [{Ino,Path}] ->
@@ -317,7 +317,7 @@ readdir_async(_Ctx, Ino, Size, Offset, _Fi, Cont, #amqpfs{}=State) ->
                                             Path2 = Path1 ++ "/" ++ P,
                                             make_inode(Path2, E, State),
                                             case ets:lookup(State#amqpfs.names, Path2) of                      
-                                                [{Path2, {ChildIno, _}}] ->
+                                                [{Path2, {_ChildIno, _}}] ->
                                                     Stat = remote_getattr(Path2, State),
                                                     {L ++ [#direntry{ name = P, offset = Acc, stat = Stat }], Acc + 1};
                                                 _ ->
@@ -363,7 +363,7 @@ write(Ctx, Ino, Data, Offset, Fi, Cont, State) ->
                end),
     { noreply, State }.
 
-write_async(_Ctx, Ino, Data, Offset, _Fi, Cont, #amqpfs{amqp_channel = Channel}=State) ->
+write_async(_Ctx, Ino, Data, Offset, _Fi, Cont, State) ->
     Result =
     case ets:lookup(State#amqpfs.inodes, Ino) of
         [{Ino,Path}] ->
@@ -383,7 +383,7 @@ access(Ctx, Ino, Mask, Cont, State) ->
     spawn_link(fun () -> access_async(Ctx, Ino, Mask, Cont, State) end),
     { noreply, State }.
 
-access_async(Ctx, Ino, Mask, Cont, State) ->
+access_async(_Ctx, _Ino, _Mask, Cont, _State) ->
     fuserlsrv:reply(Cont, #fuse_reply_err{ err = ok }).
 
 flush (_Ctx, _Inode, _Fi, _Cont, State) ->
@@ -408,14 +408,14 @@ getxattr(Ctx, Ino, Name, Size, Cont, State) ->
                end),
     { noreply, State }.
 
-getxattr_async(_Ctx, Ino, Name, Size, Cont, State) ->
+getxattr_async(_Ctx, _Ino, _Name, _Size, Cont, _State) ->
     fuserlsrv:reply(Cont, #fuse_reply_err{ err = enotsup }).
 
 listxattr(Ctx, Ino, Size, Cont, State) ->
   spawn_link(fun () -> listxattr_async(Ctx, Ino, Size, Cont, State) end),
   { noreply, State }.
 
-listxattr_async(_Ctx, Inode, Size, Cont, State) ->
+listxattr_async(_Ctx, _Ino, _Size, Cont, _State) ->
     fuserlsrv:reply(Cont, #fuse_reply_err{ err = erange }).
 
 
@@ -435,7 +435,7 @@ mknod(Ctx, ParentIno, Name, Mode, Dev, Cont, State) ->
     end.
 
 
-mknod_async(Ctx, ParentIno, Name, Mode, Dev, Cont, State) ->
+mknod_async(Ctx, _ParentIno, _Name, Mode, _Dev, Cont, _State) ->
     { Mega, Sec, _ } = erlang:now(),
     Now = 1000000 * Mega + Sec,
     Stat = #stat{ st_ino = amqpfs_inode:alloc(),
@@ -464,7 +464,7 @@ create(Ctx, ParentIno, Name, Mode, Fi, Cont, State) ->
        end),
     { noreply, State }.
 
-create_async(Ctx, ParentIno, Name, Mode, Fi, Cont, State) ->
+create_async(Ctx, _ParentIno, _Name, Mode, Fi, Cont, _State) ->
     { Mega, Sec, _ } = erlang:now(),
     Now = 1000000 * Mega + Sec,
     Stat = #stat{ st_ino = amqpfs_inode:alloc(),
@@ -561,7 +561,7 @@ setattr_stat(Stat, Attr, ToSet) ->
              st_mtime = NewMTime }.
 
 
-setattr_async(Ctx, Ino, Attr, ToSet, Fi, Cont, State) ->
+setattr_async(_Ctx, Ino, Attr, ToSet, _Fi, Cont, State) ->
     Result = 
     case ets:lookup(State#amqpfs.inodes, Ino) of
         [{Ino,Path}] ->
