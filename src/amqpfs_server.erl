@@ -123,7 +123,9 @@ init ([]) ->
 
 code_change (_OldVsn, State, _Extra) -> { ok, State }.
 
-handle_info({#'basic.deliver'{consumer_tag=ConsumerTag, delivery_tag=_DeliveryTag, redelivered=_Redelivered, exchange = <<"amqpfs.response">>, routing_key=_RoutingKey}, Content} , #amqpfs{response_routes = Tab, amqp_response_consumer_tag = ConsumerTag}=State) ->
+handle_info({#'basic.deliver'{consumer_tag=ConsumerTag, delivery_tag=_DeliveryTag, redelivered=_Redelivered, 
+                              exchange = <<"amqpfs.response">>, routing_key=_RoutingKey}, Content}, 
+            #amqpfs{response_routes = Tab, amqp_response_consumer_tag = ConsumerTag}=State) ->
     #amqp_msg{payload = Payload } = Content,
     #'P_basic'{content_type = ContentType, headers = _Headers, reply_to = Route} = Content#amqp_msg.props,
     Response = amqpfs_util:decode_payload(ContentType, Payload),
@@ -135,7 +137,9 @@ handle_info({#'basic.deliver'{consumer_tag=ConsumerTag, delivery_tag=_DeliveryTa
     end,
     {noreply, State};
     
-handle_info({#'basic.deliver'{consumer_tag=ConsumerTag, delivery_tag=_DeliveryTag, redelivered=_Redelivered, exchange = <<"amqpfs.announce">>, routing_key=_RoutingKey}, Content} , #amqpfs{amqp_consumer_tag = ConsumerTag}=State) ->
+handle_info({#'basic.deliver'{consumer_tag=ConsumerTag, delivery_tag=_DeliveryTag, redelivered=_Redelivered,
+                              exchange = <<"amqpfs.announce">>, routing_key=_RoutingKey}, Content}, 
+            #amqpfs{amqp_consumer_tag = ConsumerTag}=State) ->
     #amqp_msg{payload = Payload } = Content,
     #'P_basic'{content_type = ContentType, headers = _Headers} = Content#amqp_msg.props,
     Command = amqpfs_util:decode_payload(ContentType, Payload),
@@ -649,7 +653,8 @@ remote_setattr(Path, Attr, State) ->
 
 remote(Path, Command, #amqpfs{amqp_channel = Channel}=State) ->
     Route = register_response_route(State),
-    amqp_channel:call(Channel, #'basic.publish'{exchange = <<"amqpfs">>, routing_key = amqpfs_util:path_to_routing_key(Path)}, {amqp_msg, #'P_basic'{message_id = Route, headers = env_headers(State)}, term_to_binary(Command)}),
+    amqp_channel:call(Channel, #'basic.publish'{exchange = <<"amqpfs">>, routing_key = amqpfs_util:path_to_routing_key(Path)}, 
+                      {amqp_msg, #'P_basic'{message_id = Route, headers = env_headers(State)}, term_to_binary(Command)}),
     Response = 
         receive 
             {response, Data} -> Data
