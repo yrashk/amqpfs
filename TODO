@@ -1,2 +1,4 @@
 * TODO Make spawning in amqpfs providers optional (either using some nice option or by just forcing amqpfs providers to spawn processes themselves) :maybe:
 * TODO Review how remote_XXX() API in amqpfs_server can be simplified (it is a little bit messy as of now)
+* TODO Add caching
+** TODO Add ttl() callback
