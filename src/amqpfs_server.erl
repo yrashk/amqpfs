@@ -650,7 +650,7 @@ remote_setattr(Path, Attr, State) ->
 
 remote(Path, Command, #amqpfs{amqp_channel = Channel}=State) ->
     Route = register_response_route(State),
-    amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs">>, routing_key = amqpfs_util:path_to_routing_key(Path)}, {amqp_msg, #'P_basic'{message_id = Route, headers = env_headers(State)}, term_to_binary(Command)}),
+    amqp_channel:call(Channel, #'basic.publish'{exchange = <<"amqpfs">>, routing_key = amqpfs_util:path_to_routing_key(Path)}, {amqp_msg, #'P_basic'{message_id = Route, headers = env_headers(State)}, term_to_binary(Command)}),
     Response = 
         receive 
             {response, Data} -> Data
