@@ -45,6 +45,7 @@
 -record (amqpfs, { inodes, 
                    names,
                    response_routes,
+                   response_cache,
                    amqp_conn, amqp_channel, amqp_consumer_tag, amqp_response_consumer_tag }).
 
 -define(ON_DEMAND_TIMEOUT, 60000).
@@ -112,12 +113,13 @@ init ([]) ->
     end,
 
     State = #amqpfs{ inodes = ets:new(inodes, [public, ordered_set]),
-                      names = ets:new(names, [public, set]),
-                      response_routes = ets:new(response_routes, [public, set]),
-                      amqp_conn = AmqpConn,
-                      amqp_channel = AmqpChannel,
-                      amqp_consumer_tag = ConsumerTag,
-                      amqp_response_consumer_tag = ResponseConsumerTag
+                     names = ets:new(names, [public, set]),
+                     response_routes = ets:new(response_routes, [public, set]),
+                     response_cache = ets:new(response_cache, [public, set]),
+                     amqp_conn = AmqpConn,
+                     amqp_channel = AmqpChannel,
+                     amqp_consumer_tag = ConsumerTag,
+                     amqp_response_consumer_tag = ResponseConsumerTag
                   },
     { ok, State }.
 
@@ -127,11 +129,18 @@ handle_info({#'basic.deliver'{consumer_tag=ConsumerTag, delivery_tag=_DeliveryTa
                               exchange = <<"amqpfs.response">>, routing_key=_RoutingKey}, Content}, 
             #amqpfs{response_routes = Tab, amqp_response_consumer_tag = ConsumerTag}=State) ->
     #amqp_msg{payload = Payload } = Content,
-    #'P_basic'{content_type = ContentType, headers = _Headers, reply_to = Route} = Content#amqp_msg.props,
+    #'P_basic'{content_type = ContentType, headers = Headers, reply_to = Route} = Content#amqp_msg.props,
+    TTL = 
+        case lists:keysearch(<<"ttl">>, 1, Headers) of
+            {value, {<<"ttl">>, _, Val}} ->
+                Val;
+            _ ->
+                0
+        end,
     Response = amqpfs_util:decode_payload(ContentType, Payload),
     case ets:lookup(Tab, Route) of 
         [{Route, Pid}] ->
-            Pid ! {response, Response};
+            Pid ! {response, Response, TTL};
         _ ->
             discard
     end,
@@ -650,13 +659,35 @@ remote_getattr(Path, State) ->
 remote_setattr(Path, Attr, State) ->
     remote(Path, {setattr, Path, Attr}, State).
 
-remote(Path, Command, #amqpfs{amqp_channel = Channel}=State) ->
+remote(Path, Command, #amqpfs{response_cache = Tab}=State) ->
+    case ets:lookup(Tab, Command) of
+        [{Command, CachedAt, CacheTTL, CachedData}] ->
+            Now = now(),
+            case timer:now_diff(Now, CachedAt) >= CacheTTL of
+                false ->
+                    io:format("using some cache ~p~n",[CachedData]),
+                    CachedData;
+                true ->
+                    io:format("killing cache~n"),
+                    ets:delete(Tab, Command),
+                    remote_impl(Path, Command, State)
+            end;
+        [] ->
+            remote_impl(Path, Command, State)
+    end.
+
+remote_impl(Path, Command, #amqpfs{amqp_channel = Channel, response_cache = Tab}=State) ->
     Route = register_response_route(State),
     amqp_channel:call(Channel, #'basic.publish'{exchange = <<"amqpfs">>, routing_key = amqpfs_util:path_to_routing_key(Path)}, 
                       {amqp_msg, #'P_basic'{message_id = Route, headers = env_headers(State)}, term_to_binary(Command)}),
     Response = 
         receive 
-            {response, Data} -> Data
+            {response, Data, 0} ->
+                ets:delete(Tab, Command),
+                Data;
+            {response, Data, TTL} when is_integer(TTL) -> 
+                ets:insert(Tab, {Command, now(), TTL, Data}),
+                Data
         after ?ON_DEMAND_TIMEOUT ->
                 []
         end,

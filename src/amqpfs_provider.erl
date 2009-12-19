@@ -52,9 +52,9 @@ handle_info_async({#'basic.deliver'{consumer_tag=_ConsumerTag, delivery_tag=_Del
         _ ->
             case Command of
                 {list_dir, Path} ->
-                    spawn(fun () -> send_response(MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(list_dir,[Path, ReqState], ReqState)), ReqState) end);
+                    spawn(fun () -> send_response(MessageId, ?CONTENT_TYPE_BERT, [ttl(Path, ReqState)], term_to_binary(call_module(list_dir,[Path, ReqState], ReqState)), ReqState) end);
                 {open, Path, Fi} ->
-                    spawn(fun () -> send_response(MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(open, [Path, Fi, ReqState], ReqState)), ReqState) end);
+                    spawn(fun () -> send_response(MessageId, ?CONTENT_TYPE_BERT, [ttl(Path, ReqState)], term_to_binary(call_module(open, [Path, Fi, ReqState], ReqState)), ReqState) end);
                 {read, Path, Size, Offset} ->
                     spawn(fun () -> 
                                   {ResultContentType, Result} = 
@@ -64,14 +64,14 @@ handle_info_async({#'basic.deliver'{consumer_tag=_ConsumerTag, delivery_tag=_Del
                                           Datum ->
                                               {?CONTENT_TYPE_BERT, term_to_binary(Datum)}
                                       end,
-                                  send_response(MessageId, ResultContentType, [], Result, ReqState)
+                                  send_response(MessageId, ResultContentType, [ttl(Path, ReqState)], Result, ReqState)
                           end);
                 {write, Path, Data, Offset} ->
-                    spawn(fun () -> send_response(MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(write, [Path, Data, Offset, ReqState], ReqState)), ReqState) end);
+                    spawn(fun () -> send_response(MessageId, ?CONTENT_TYPE_BERT, [ttl(Path, ReqState)], term_to_binary(call_module(write, [Path, Data, Offset, ReqState], ReqState)), ReqState) end);
                 {getattr, Path} ->
-                    spawn(fun () -> send_response(MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(getattr, [Path, ReqState], ReqState)), ReqState) end);
+                    spawn(fun () -> send_response(MessageId, ?CONTENT_TYPE_BERT, [ttl(Path, ReqState)], term_to_binary(call_module(getattr, [Path, ReqState], ReqState)), ReqState) end);
                 {setattr, Path, Attr} ->
-                    spawn(fun () -> send_response(MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(setattr, [Path, Attr, ReqState], ReqState)), ReqState) end);
+                    spawn(fun () -> send_response(MessageId, ?CONTENT_TYPE_BERT, [ttl(Path, ReqState)], term_to_binary(call_module(setattr, [Path, Attr, ReqState], ReqState)), ReqState) end);
                 _ ->
                     ignore
             end
@@ -95,6 +95,9 @@ send_response(ReplyTo, ContentType, Headers, Content, #amqpfs_provider_state{cha
                                             headers = Headers
                                             },
                        Content}).
+
+ttl(Path, State) ->
+    {"ttl", long, call_module(ttl, [Path, State], State)}.
 
 %%%%
 

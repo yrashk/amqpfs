@@ -4,6 +4,7 @@
          object/2, size/2, resize/3,
          write/4,
          handle_info/2,
+         ttl/2,
          allow_request/1]).
 
 -include_lib("amqpfs/include/amqpfs.hrl").
@@ -68,6 +69,9 @@ getattr(Path,State) ->
 
 handle_info(_Msg, _State) ->
     ignore.
+
+ttl(_, _) ->
+    0.
 
 allow_request(_State) ->
     true.
