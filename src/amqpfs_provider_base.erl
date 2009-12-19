@@ -1,7 +1,7 @@
 -module(amqpfs_provider_base).
 
 -export([amqp_credentials/0, init/1, list_dir/2, open/2, read/4, getattr/2, setattr/3,
-         object/2, size/2,
+         object/2, size/2, resize/3,
          write/4,
          handle_info/2,
          allow_request/1]).
@@ -49,7 +49,17 @@ size(Path, State) ->
             size(Datum)
     end.
 
-setattr(_Path, Attr, _State) ->
+resize(_Path, NewSize, _State) ->
+    NewSize.
+
+setattr(Path, Attr, State) ->
+    Size = amqpfs_provider:call_module(size, [Path, State], State),
+    if 
+        Size  =/= Attr#stat.st_size ->
+            amqpfs_provider:call_module(resize, [Path, Attr#stat.st_size, State], State);
+        true ->
+            skip
+    end,
     Attr.
 
 getattr(Path,State) ->

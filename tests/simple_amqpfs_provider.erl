@@ -1,6 +1,6 @@
 -module(simple_amqpfs_provider). 
 
--export([init/1, list_dir/2, open/2, write/4, object/2]).
+-export([init/1, list_dir/2, open/2, resize/3, write/4, object/2]).
 
 -include_lib("amqpfs/include/amqpfs.hrl").
 
@@ -19,6 +19,10 @@ list_dir("/simple_on_demand", State) ->
 
 open("/simple_on_demand/bogus", _State) ->
     ok.
+
+resize("/simple_on_demand/bogus", NewSize, _State) ->
+    io:format("Resizing to ~p~n",[NewSize]),
+    NewSize.
 
 write("/simple_on_demand/bogus", Data, Offset, _State) ->
     io:format("Writing ~p at ~p~n",[binary_to_list(Data), Offset]),
