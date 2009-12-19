@@ -260,8 +260,8 @@ open(Ctx, Ino, Fi, Cont, State) ->
     { noreply, State }.
 
 opendir(Ctx, Ino, Fi, Cont, State) ->
-  spawn_link (fun () -> open_async(Ctx, Ino, Fi, Cont, State) end),
-  { noreply, State }.
+    spawn_link (fun () -> open_async(Ctx, Ino, Fi, Cont, State) end),
+    { noreply, State }.
 
 open_async(_Ctx, Ino, Fi, Cont, State) ->
     Result =
