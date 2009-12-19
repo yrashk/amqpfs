@@ -600,7 +600,7 @@ setattr_async(Ctx, Ino, Attr, ToSet, Fi, Cont, State) ->
         [{Ino,Path}] ->
             case remote_getattr(Path, State) of
                 #stat{}=Stat -> 
-                    Stat0 = Stat#stat{ st_ino = Stat, st_mode = ?S_IFREG bor 8#0666 },
+                    Stat0 = Stat#stat{ st_ino = Ino, st_mode = ?S_IFREG bor 8#0666 },
                     Stat1 = remote_setattr(Path, setattr_stat(Stat0, Attr, ToSet), State),
                     #fuse_reply_attr{ attr = Stat1#stat{ st_ino = Ino } , attr_timeout_ms = 1000 };
                 Err -> #fuse_reply_err { err = Err}
