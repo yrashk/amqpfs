@@ -420,7 +420,6 @@ listxattr_async(_Ctx, _Ino, _Size, Cont, _State) ->
 
 
 mknod(Ctx, ParentIno, Name, Mode, Dev, Cont, State) ->
-    io:format("mknod ~p Mode ~p~n", [Name, Mode]),
     case Mode band ?S_IFMT of
         N when ((N =:= ?S_IFLNK) or 
                 (N =:= ?S_IFREG) or 
