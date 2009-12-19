@@ -661,6 +661,8 @@ remote_setattr(Path, Attr, State) ->
 
 remote(Path, Command, #amqpfs{response_cache = Tab}=State) ->
     case ets:lookup(Tab, Command) of
+        [{Command, _, -1, CachedData}] ->
+            CachedData;
         [{Command, CachedAt, CacheTTL, CachedData}] ->
             Now = now(),
             case timer:now_diff(Now, CachedAt) >= CacheTTL of
