@@ -99,7 +99,7 @@ send_response(ReplyTo, ContentType, Headers, Content, #amqpfs_provider_state{cha
 ttl(Path, State) ->
     case call_module(ttl, [Path, State], State) of
         forever ->
-            {"tt", long, -1};
+            {"ttl", long, -1};
         Val ->
             {"ttl", long, Val}
     end.
