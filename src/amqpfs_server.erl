@@ -317,9 +317,7 @@ readdir_async(_Ctx, Ino, Size, Offset, _Fi, Cont, #amqpfs{}=State) ->
                                             Path2 = Path1 ++ "/" ++ P,
                                             make_inode(Path2, E, State),
                                             case ets:lookup(State#amqpfs.names, Path2) of                      
-                                                [{Path2, {ChildIno, {directory, _Extra}}}] ->
-                                                    {L ++ [#direntry{ name = P, offset = Acc, stat = ?DIRATTR(ChildIno)}], Acc + 1};
-                                                [{Path2, {ChildIno, {file, on_demand}}}] ->
+                                                [{Path2, {ChildIno, _}}] ->
                                                     Stat = remote_getattr(Path2, State),
                                                     {L ++ [#direntry{ name = P, offset = Acc, stat = Stat }], Acc + 1};
                                                 _ ->
