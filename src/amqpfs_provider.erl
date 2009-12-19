@@ -40,11 +40,7 @@ handle_info(Msg, State) ->
 handle_info_async({#'basic.deliver'{consumer_tag=_ConsumerTag, delivery_tag=_DeliveryTag, redelivered=_Redelivered, exchange = <<"amqpfs">>, routing_key=_RoutingKey}, Content}, State) ->
     #amqp_msg{payload = Payload } = Content,
     #'P_basic'{content_type = ContentType, headers = Headers, message_id = MessageId} = Content#amqp_msg.props,
-    Command =
-        case ContentType of
-            _ ->
-                binary_to_term(Payload)
-        end,
+    Command = amqpfs_util:decode_payload(ContentType, Payload),
     ReqState = State#amqpfs_provider_state{ request_headers = Headers, request_command = Command },
     case call_module(allow_request,[ReqState], ReqState) of
         false ->
