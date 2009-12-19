@@ -1,6 +1,6 @@
 -module(mq_amqpfs_provider). 
 
--export([init/1, list_dir/2, open/2, getattr/2]).
+-export([init/1, list_dir/2, open/3, getattr/2]).
 
 -include_lib("amqpfs/include/amqpfs.hrl").
 
@@ -16,7 +16,7 @@ list_dir("/mq/exchanges", _State) ->
     Exchanges = rpc:call('rabbit@hq', rabbit_exchange, info_all, [<<"/">>,[name]]),
     lists:filter(fun ({Name, _}) -> Name /= [] end, lists:map(fun ([{name, {resource, _, exchange, BinName}}]) -> {binary_to_list(BinName), {directory, on_demand}} end, Exchanges)).
     
-open(_, _State) ->
+open(_, _Fi, _State) ->
     ok.
 
 

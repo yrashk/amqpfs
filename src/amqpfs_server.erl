@@ -262,7 +262,7 @@ open_async(_Ctx, Ino, Fi, Cont, #amqpfs{amqp_channel = Channel}=State) ->
     case ets:lookup(State#amqpfs.inodes, Ino) of
         [{Ino,Path}] ->
             Route = register_response_route(State),
-            amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs">>, routing_key = amqpfs_util:path_to_routing_key(Path)}, {amqp_msg, #'P_basic'{message_id = Route, headers = env_headers(State)}, term_to_binary({open, Path})}),
+            amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs">>, routing_key = amqpfs_util:path_to_routing_key(Path)}, {amqp_msg, #'P_basic'{message_id = Route, headers = env_headers(State)}, term_to_binary({open, Path, Fi})}),
             Response = 
                 receive 
                     {response, Data} -> Data

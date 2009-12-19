@@ -53,8 +53,8 @@ handle_info_async({#'basic.deliver'{consumer_tag=_ConsumerTag, delivery_tag=_Del
             case Command of
                 {list_dir, Path} ->
                     spawn(fun () -> amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs.response">>}, {amqp_msg, #'P_basic'{reply_to = MessageId, content_type = ?CONTENT_TYPE_BERT }, term_to_binary(call_module(list_dir,[Path, ReqState], ReqState))}) end);
-                {open, Path} ->
-                    spawn(fun () -> amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs.response">>}, {amqp_msg, #'P_basic'{reply_to = MessageId, content_type = ?CONTENT_TYPE_BERT }, term_to_binary(call_module(open, [Path, ReqState], ReqState))}) end);
+                {open, Path, Fi} ->
+                    spawn(fun () -> amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs.response">>}, {amqp_msg, #'P_basic'{reply_to = MessageId, content_type = ?CONTENT_TYPE_BERT }, term_to_binary(call_module(open, [Path, Fi, ReqState], ReqState))}) end);
                 {read, Path, Size, Offset} ->
                     spawn(fun () -> 
                                   {ResultContentType, Result} = 

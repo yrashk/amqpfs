@@ -2,7 +2,7 @@
 
 -export([init/1, 
          list_dir/2,
-         open/2,
+         open/3,
          object/2,
          allow_request/1]).
 
@@ -15,7 +15,7 @@ init(State) ->
 list_dir("/.amqpfs", _State) ->
     [{"version", {file, on_demand}}].
 
-open("/.amqpfs/version", _State) ->
+open("/.amqpfs/version", _Fi, _State) ->
     ok.
 
 object("/.amqpfs/version", _State) ->
