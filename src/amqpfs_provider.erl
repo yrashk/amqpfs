@@ -37,7 +37,7 @@ handle_info(Msg, State) ->
     spawn(fun () -> handle_info_async(Msg, State) end),
     {noreply, State}.
 
-handle_info_async({#'basic.deliver'{consumer_tag=_ConsumerTag, delivery_tag=_DeliveryTag, redelivered=_Redelivered, exchange = <<"amqpfs">>, routing_key=_RoutingKey}, Content}, #amqpfs_provider_state{channel = Channel} = State) ->
+handle_info_async({#'basic.deliver'{consumer_tag=_ConsumerTag, delivery_tag=_DeliveryTag, redelivered=_Redelivered, exchange = <<"amqpfs">>, routing_key=_RoutingKey}, Content}, State) ->
     #amqp_msg{payload = Payload } = Content,
     #'P_basic'{content_type = ContentType, headers = Headers, message_id = MessageId} = Content#amqp_msg.props,
     Command =
@@ -52,9 +52,9 @@ handle_info_async({#'basic.deliver'{consumer_tag=_ConsumerTag, delivery_tag=_Del
         _ ->
             case Command of
                 {list_dir, Path} ->
-                    spawn(fun () -> amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs.response">>}, {amqp_msg, #'P_basic'{reply_to = MessageId, content_type = ?CONTENT_TYPE_BERT }, term_to_binary(call_module(list_dir,[Path, ReqState], ReqState))}) end);
+                    spawn(fun () -> send_response(MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(list_dir,[Path, ReqState], ReqState)), ReqState) end);
                 {open, Path, Fi} ->
-                    spawn(fun () -> amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs.response">>}, {amqp_msg, #'P_basic'{reply_to = MessageId, content_type = ?CONTENT_TYPE_BERT }, term_to_binary(call_module(open, [Path, Fi, ReqState], ReqState))}) end);
+                    spawn(fun () -> send_response(MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(open, [Path, Fi, ReqState], ReqState)), ReqState) end);
                 {read, Path, Size, Offset} ->
                     spawn(fun () -> 
                                   {ResultContentType, Result} = 
@@ -64,14 +64,14 @@ handle_info_async({#'basic.deliver'{consumer_tag=_ConsumerTag, delivery_tag=_Del
                                           Datum ->
                                               {?CONTENT_TYPE_BERT, term_to_binary(Datum)}
                                       end,
-                                  amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs.response">>}, {amqp_msg, #'P_basic'{reply_to = MessageId, content_type = ResultContentType}, Result}) 
+                                  send_response(MessageId, ResultContentType, [], Result, ReqState)
                           end);
                 {write, Path, Data, Offset} ->
-                    spawn(fun () -> amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs.response">>}, {amqp_msg, #'P_basic'{reply_to = MessageId, content_type = ?CONTENT_TYPE_BERT }, term_to_binary(call_module(write, [Path, Data, Offset, ReqState], ReqState))}) end);
+                    spawn(fun () -> send_response(MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(write, [Path, Data, Offset, ReqState], ReqState)), ReqState) end);
                 {getattr, Path} ->
-                    spawn(fun () -> amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs.response">>}, {amqp_msg, #'P_basic'{reply_to = MessageId, content_type = ?CONTENT_TYPE_BERT}, term_to_binary(call_module(getattr, [Path, ReqState], ReqState))}) end);
+                    spawn(fun () -> send_response(MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(getattr, [Path, ReqState], ReqState)), ReqState) end);
                 {setattr, Path, Attr} ->
-                    spawn(fun () -> amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs.response">>}, {amqp_msg, #'P_basic'{reply_to = MessageId, content_type = ?CONTENT_TYPE_BERT}, term_to_binary(call_module(setattr, [Path, Attr, ReqState], ReqState))}) end);
+                    spawn(fun () -> send_response(MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(setattr, [Path, Attr, ReqState], ReqState)), ReqState) end);
                 _ ->
                     ignore
             end
@@ -85,6 +85,17 @@ code_change(_OldVsn, State, _Extra) ->
 
 terminate(_Reason, _State) ->
     ok.
+%%%%
+
+
+send_response(ReplyTo, ContentType, Headers, Content, #amqpfs_provider_state{channel = Channel}) ->
+    amqp_channel:call(Channel, #'basic.publish'{exchange = <<"amqpfs.response">>},
+                      {amqp_msg, #'P_basic'{reply_to = ReplyTo,
+                                            content_type = ContentType,
+                                            headers = Headers
+                                            },
+                       Content}).
+
 %%%%
 
 announce(directory, Name, #amqpfs_provider_state{ channel = Channel } = State) ->
