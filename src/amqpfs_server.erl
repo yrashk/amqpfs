@@ -665,10 +665,8 @@ remote(Path, Command, #amqpfs{response_cache = Tab}=State) ->
             Now = now(),
             case timer:now_diff(Now, CachedAt) >= CacheTTL of
                 false ->
-                    io:format("using some cache ~p~n",[CachedData]),
                     CachedData;
                 true ->
-                    io:format("killing cache~n"),
                     ets:delete(Tab, Command),
                     remote_impl(Path, Command, State)
             end;
