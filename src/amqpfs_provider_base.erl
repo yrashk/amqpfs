@@ -29,8 +29,10 @@ read(Path, Size, Offset, State) ->
         Datum when is_binary(Datum) ->
             Datum
     end,
-    {_, Result1} = split_binary(Result, Offset),
-    {Result2, _} = split_binary(Result1, Size),
+    ProperOffset = erlang:min(Offset, size(Result)),
+    {_, Result1} = split_binary(Result, ProperOffset),
+    ProperSize = erlang:min(Size, size(Result1)),
+    {Result2, _} = split_binary(Result1, ProperSize),
     Result2.
 
 write(_Path, _Data, _Offset, _State) ->
