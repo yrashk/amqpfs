@@ -210,7 +210,7 @@ lookup_async(_Ctx, ParentIno, BinPath, Cont, State) ->
             Result =
             case ets:lookup(State#amqpfs.names, Path) of
                 [{Path, { ParentIno, {directory, on_demand}}}] ->
-                    Response = directory_on_demand(Path, State),
+                    Response = remote_list_dir(Path, State),
                     List = lists:map(fun ({P,E}) -> 
                                              Path2 = Path1 ++ "/" ++ P,
                                              {_Ino, _} = make_inode(Path2, E, State),
@@ -316,7 +316,7 @@ readdir_async(_Ctx, Ino, Size, Offset, _Fi, Cont, #amqpfs{}=State) ->
                         end,
                 case ets:lookup(State#amqpfs.names, Path) of
                     [{Path, { Ino, {directory, on_demand}}}] ->
-                        Response = directory_on_demand(Path, State),
+                        Response = remote_list_dir(Path, State),
                         lists:foldl(fun ({P, E}, {L, Acc}) -> 
                                             Path2 = Path1 ++ "/" ++ P,
                                             make_inode(Path2, E, State),
@@ -634,7 +634,7 @@ register_response_route(#amqpfs{response_routes=Tab}) ->
 unregister_response_route(Route, #amqpfs{response_routes=Tab}) ->
     ets:delete(Tab, Route).
             
-directory_on_demand(Path, State) ->
+remote_list_dir(Path, State) ->
     remote(Path, {list_dir, Path}, State).
 
 remote_getattr(Path, State) ->
