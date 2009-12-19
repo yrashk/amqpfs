@@ -497,8 +497,27 @@ create_async(Ctx, _ParentIno, _Name, Mode, Fi, Cont, _State) ->
     fuserlsrv:reply(Cont, #fuse_reply_create{ fuse_entry_param = Param, 
                                               fuse_file_info = Fi }).
 
-release(_Ctx, _Ino, _Fi, _Cont, State) ->
-  { #fuse_reply_err{ err = ok }, State }.
+release(Ctx, Ino, Fi, Cont, State) ->
+    spawn_link 
+      (fun () -> 
+               release_async(Ctx, Ino, Fi, Cont, State)
+       end),
+    { noreply, State }.
+
+release_async(_Ctx, Ino, Fi, Cont, State) ->
+    Result =
+        case ets:lookup(State#amqpfs.inodes, Ino) of
+            [{Ino,Path}] ->
+                Response = remote(Path, {release, Path, Fi}, State),
+                case Response of
+                    ok -> #fuse_reply_err{ err = ok };
+                    eio -> #fuse_reply_err { err = eio};
+                    _ -> #fuse_reply_err { err = einval}
+                end;
+            _ ->
+            #fuse_reply_err{ err = enoent }
+        end,
+    fuserlsrv:reply(Cont, Result).
 
 releasedir(_Ctx, _Ino, _Fi, _Cont, State) ->
   { #fuse_reply_err{ err = ok }, State }.

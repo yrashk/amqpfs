@@ -68,6 +68,8 @@ handle_info_async({#'basic.deliver'{consumer_tag=_ConsumerTag, delivery_tag=_Del
                     spawn(fun () -> send_response(MessageId, ?CONTENT_TYPE_BERT, [ttl(Path, ReqState)], term_to_binary(call_module(getattr, [Path, ReqState], ReqState)), ReqState) end);
                 {setattr, Path, Attr} ->
                     spawn(fun () -> send_response(MessageId, ?CONTENT_TYPE_BERT, [ttl(Path, ReqState)], term_to_binary(call_module(setattr, [Path, Attr, ReqState], ReqState)), ReqState) end);
+                {release, Path, Fi} ->
+                    spawn(fun () -> send_response(MessageId, ?CONTENT_TYPE_BERT, [ttl(Path, ReqState)], term_to_binary(call_module(release, [Path, Fi, ReqState], ReqState)), ReqState) end); 
                 _ ->
                     ignore
             end

@@ -1,6 +1,9 @@
 -module(amqpfs_provider_base).
 
--export([amqp_credentials/0, init/1, list_dir/2, open/3, read/4, getattr/2, setattr/3,
+-export([amqp_credentials/0, init/1, 
+         list_dir/2, 
+         open/3, release/3,
+         read/4, getattr/2, setattr/3,
          object/2, size/2, resize/3,
          write/4,
          handle_info/2,
@@ -20,6 +23,9 @@ list_dir(_, _State) ->
     [].
 
 open(_, _Fi, _State) ->
+    ok.
+
+release(_, _Fi, _State) ->
     ok.
 
 read(Path, Size, Offset, State) ->
