@@ -3,7 +3,7 @@
 -export([amqp_credentials/0, init/1, 
          list_dir/2, 
          open/3, release/3,
-         read/4, getattr/2, setattr/3,
+         read/4, getattr/2, setattr/5,
          object/2, size/2, resize/3,
          write/4,
          handle_info/2,
@@ -59,15 +59,47 @@ size(Path, State) ->
 resize(_Path, NewSize, _State) ->
     NewSize.
 
-setattr(Path, Attr, State) ->
-    Size = amqpfs_provider:call_module(size, [Path, State], State),
-    if 
-        Size  =/= Attr#stat.st_size ->
-            amqpfs_provider:call_module(resize, [Path, Attr#stat.st_size, State], State);
-        true ->
-            skip
-    end,
-    Attr.
+setattr(Path, Stat, Attr, ToSet, State) ->
+    NewMode = 
+        if ToSet band ?FUSE_SET_ATTR_MODE > 0 -> Attr#stat.st_mode;
+           true -> Stat#stat.st_mode
+        end,
+    
+    NewUid = 
+        if ToSet band ?FUSE_SET_ATTR_UID > 0 -> Attr#stat.st_uid;
+           true -> Stat#stat.st_uid
+        end,
+    
+    NewGid = 
+        if ToSet band ?FUSE_SET_ATTR_GID > 0 -> Attr#stat.st_gid;
+           true -> Stat#stat.st_gid
+        end,
+    
+    NewSize = 
+        if ToSet band ?FUSE_SET_ATTR_SIZE > 0 -> 
+                amqpfs_provider:call_module(resize, [Path, Attr#stat.st_size, State], State),
+                Attr#stat.st_size;
+           true -> 
+                Stat#stat.st_size
+        end,
+    
+    NewATime = 
+        if ToSet band ?FUSE_SET_ATTR_ATIME > 0 -> Attr#stat.st_atime;
+           true -> Stat#stat.st_atime
+        end,
+    
+    NewMTime = 
+        if ToSet band ?FUSE_SET_ATTR_MTIME > 0 -> Attr#stat.st_mtime;
+           true -> Stat#stat.st_mtime
+        end,
+    
+    Stat#stat{ st_mode = NewMode,
+               st_uid = NewUid,
+               st_gid = NewGid,
+               st_size = NewSize,
+               st_atime = NewATime,
+               st_mtime = NewMTime }.
+
 
 getattr(Path,State) ->
     Size = amqpfs_provider:call_module(size, [Path, State], State),

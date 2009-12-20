@@ -551,53 +551,13 @@ setattr(Ctx, Ino, Attr, ToSet, Fi, Cont, State) ->
     spawn_link(fun () -> setattr_async(Ctx, Ino, Attr, ToSet, Fi, Cont, State) end),
     { noreply, State }.
 
-
-setattr_stat(Stat, Attr, ToSet) ->
-  NewMode = 
-    if ToSet band ?FUSE_SET_ATTR_MODE > 0 -> Attr#stat.st_mode;
-       true -> Stat#stat.st_mode
-    end,
-
-  NewUid = 
-    if ToSet band ?FUSE_SET_ATTR_UID > 0 -> Attr#stat.st_uid;
-       true -> Stat#stat.st_uid
-    end,
-
-  NewGid = 
-    if ToSet band ?FUSE_SET_ATTR_GID > 0 -> Attr#stat.st_gid;
-       true -> Stat#stat.st_gid
-    end,
-
-  NewSize = 
-    if ToSet band ?FUSE_SET_ATTR_SIZE > 0 -> Attr#stat.st_size;
-       true -> Stat#stat.st_size
-    end,
-
-  NewATime = 
-    if ToSet band ?FUSE_SET_ATTR_ATIME > 0 -> Attr#stat.st_atime;
-       true -> Stat#stat.st_atime
-    end,
-
-  NewMTime = 
-    if ToSet band ?FUSE_SET_ATTR_MTIME > 0 -> Attr#stat.st_mtime;
-       true -> Stat#stat.st_mtime
-    end,
-
-  Stat#stat{ st_mode = NewMode,
-             st_uid = NewUid,
-             st_gid = NewGid,
-             st_size = NewSize,
-             st_atime = NewATime,
-             st_mtime = NewMTime }.
-
-
 setattr_async(_Ctx, Ino, Attr, ToSet, _Fi, Cont, State) ->
     Result = 
     case ets:lookup(State#amqpfs.inodes, Ino) of
         [{Ino,Path}] ->
             case remote_getattr(Path, State) of
                 #stat{}=Stat -> 
-                    Stat1 = remote_setattr(Path, setattr_stat(Stat, Attr, ToSet), State),
+                    Stat1 = remote_setattr(Path, Stat, Attr, ToSet, State),
                     #fuse_reply_attr{ attr = Stat1 , attr_timeout_ms = 1000 };
                 Err -> #fuse_reply_err { err = Err}
             end;
@@ -675,8 +635,8 @@ remote_getattr(Path, State) ->
             Stat0
     end.
 
-remote_setattr(Path, Attr, State) ->
-    remote(Path, {setattr, Path, Attr}, State).
+remote_setattr(Path, Stat, Attr, ToSet, State) ->
+    remote(Path, {setattr, Path, Stat, Attr, ToSet}, State).
 
 remote(Path, Command, #amqpfs{response_cache = Tab}=State) ->
     case ets:lookup(Tab, Command) of

@@ -1,4 +1,4 @@
-* TODO Consider moving amqpfs_server:setattr_stat code to amqpfs_provider_base so it will be easier to detect what was actually set
+* DONE Consider moving amqpfs_server:setattr_stat code to amqpfs_provider_base so it will be easier to detect what was actually set
 * TODO Make spawning in amqpfs providers optional (either using some nice option or by just forcing amqpfs providers to spawn processes themselves) :maybe:
 * TODO Review how remote_XXX() API in amqpfs_server can be simplified (it is a little bit messy as of now)
 * DONE Add caching
