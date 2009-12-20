@@ -183,9 +183,7 @@ getattr_async(Ctx, Ino, Cont, State) ->
     case ets:lookup(State#amqpfs.inodes, Ino) of
         [{Ino, Path}] ->
             case ets:lookup(State#amqpfs.names, Path) of
-                [{Path, { Ino, {directory, _} } }] ->
-                    #fuse_reply_attr{ attr = ?DIRATTR (Ino), attr_timeout_ms = 1000 };
-                [{Path, { Ino, {file, on_demand} } }] ->
+                [{Path, { Ino, _ } }] ->
                     case remote_getattr(Path, Ctx, State) of
                         #stat{}=Stat -> #fuse_reply_attr{ attr = Stat, attr_timeout_ms = 1000 };
                         Err -> #fuse_reply_err { err = Err}
