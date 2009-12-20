@@ -36,6 +36,8 @@ run: main
 run-simple: main
 	@erl -sname fstest -pa tests ebin vendor/fuserl/fuserl/src/ vendor/erabbitmq/ebin/ vendor/rabbitmq-erlang-client/ebin/ vendor/rabbitmq-server/ebin/ -boot start_sasl -eval "application:load(fuserl)" -config configs/development -s erabbitmq -s amqpfs -eval "amqpfs_provider:start(simple_amqpfs_provider)"
 
+run-mq: main
+	@erl -sname fstest -pa tests ebin vendor/fuserl/fuserl/src/ vendor/erabbitmq/ebin/ vendor/rabbitmq-erlang-client/ebin/ vendor/rabbitmq-server/ebin/ -boot start_sasl -eval "application:load(fuserl)" -config configs/development -s erabbitmq -s amqpfs -eval "amqpfs_provider:start(mq_amqpfs_provider,[{amqp_broker_node, ${NODE}}])"
 
 clean:
 	rm -rf tmp
