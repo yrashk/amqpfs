@@ -8,6 +8,7 @@
          atime/2, mtime/2,
          append/3,
          write/4, output/4,
+         readable/3, writable/3, executable/3,
          handle_info/2,
          ttl/2,
          allow_request/1]).
@@ -75,6 +76,14 @@ atime(_Path, _State) ->
 mtime(_Path, _State) ->
     {{1969,12,31},{00,00,00}}.
 
+readable(_Path, _Group, _State) ->
+    true.
+
+writable(_Path, _Group, _State) ->
+    true.
+
+executable(_Path, _Group, _State) ->
+    false.
 
 resize(_Path, NewSize, _State) ->
     NewSize.
@@ -121,13 +130,30 @@ setattr(Path, Stat, Attr, ToSet, State) ->
                st_mtime = NewMTime }.
 
 
+mode(true, N) ->
+    N;
+mode(false, _) ->
+    0.
+
 getattr(Path,State) ->
     Size = amqpfs_provider:call_module(size, [Path, State], State),
     ATime = amqpfs_util:datetime_to_unixtime(amqpfs_provider:call_module(atime, [Path, State], State)),
     MTime = amqpfs_util:datetime_to_unixtime(amqpfs_provider:call_module(mtime, [Path, State], State)),
+    Mode =
+        (mode(readable(Path, owner, State), ?S_IRUSR) bor
+         mode(writable(Path, owner, State), ?S_IWUSR) bor
+         mode(executable(Path, owner, State), ?S_IXUSR)) bor
+        (mode(readable(Path, group, State), ?S_IRGRP) bor
+         mode(writable(Path, group, State), ?S_IWGRP) bor
+         mode(executable(Path, group, State), ?S_IXGRP)) bor
+        (mode(readable(Path, other, State), ?S_IROTH) bor
+         mode(writable(Path, other, State), ?S_IWOTH) bor
+         mode(executable(Path, other, State), ?S_IXOTH)),
     #stat{ st_atime = ATime,
            st_mtime = MTime,
-           st_size = Size }.
+           st_size = Size,
+           st_mode = Mode
+         }.
 
 handle_info(_Msg, _State) ->
     ignore.
