@@ -22,6 +22,7 @@
 ** TODO create
 ** TODO releasedir
 * TODO For a short period of time after startup, some of root directories do not belong to uid/gid, but to root/root (means 0)
+* TODO Consider counting st_nlinks for directories properly
 * TODO . and .. should get proper uid/gid (now they are just 0/0), as well as permissions, actually
 * DONE Add readable(Path, owner|group|other, State), writable(Path, ..., ...) and executable(Path, ..., ...) callbacks
 * TODO Consider passing Fi for write and read
