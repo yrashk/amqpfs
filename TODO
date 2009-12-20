@@ -22,7 +22,7 @@
 ** TODO create
 ** TODO releasedir
 * TODO For a short period of time after startup, some of root directories do not belong to uid/gid, but to root/root (means 0)
-* TODO Consider counting st_nlinks for directories properly
+* DONE Consider counting st_nlinks for directories properly
 * DONE . and .. should get proper uid/gid (now they are just 0/0), as well as permissions, actually
 * DONE Add readable(Path, owner|group|other, State), writable(Path, ..., ...) and executable(Path, ..., ...) callbacks
 * TODO When mounted using some user account, but then mount point is listed under root, it is a complete mess:
