@@ -21,6 +21,7 @@
 ** TODO mknod
 ** TODO create
 ** TODO releasedir
+* TODO For a short period of time after startup, some of root directories do not belong to uid/gid, but to root/root (means 0)
 * DONE Add readable(Path, owner|group|other, State), writable(Path, ..., ...) and executable(Path, ..., ...) callbacks
 * TODO Consider passing Fi for write and read
 * DONE Now sure what to do with timezones, currently 0 will not correspond to 1970/1/1 00:00 (unless you're in London or anywhere else with GMT+0). Observed this in PST
