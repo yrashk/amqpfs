@@ -1,6 +1,6 @@
 -module(simple_amqpfs_provider). 
 
--export([init/1, list_dir/2, open/3, resize/3, write/4, object/2, ttl/2]).
+-export([init/1, list_dir/2, open/3, resize/3, write/4, object/2, atime/2, mtime/2, ttl/2]).
 
 -include_lib("amqpfs/include/amqpfs.hrl").
 
@@ -32,6 +32,12 @@ write("/simple_on_demand/bogus", Data, Offset, _State) ->
 
 object("/simple_on_demand/bogus", _State) ->
     ?BOGUS_CONTENT.
+
+atime("/simple_on_demand/bogus", _State) ->
+    {{2009,12,19},{18,45,35}}.
+
+mtime("/simple_on_demand/bogus", _State) ->
+    {{2009,12,19},{18,45,37}}.
 
 ttl("/simple_on_demand/bogus"=Path, #amqpfs_provider_state{ request_command = {read, Path, _, _} }) ->
     3000000.

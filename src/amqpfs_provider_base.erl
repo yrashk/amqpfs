@@ -5,6 +5,7 @@
          open/3, release/3,
          read/4, getattr/2, setattr/5,
          object/2, size/2, resize/3,
+         atime/2, mtime/2,
          write/4,
          handle_info/2,
          ttl/2,
@@ -56,6 +57,13 @@ size(Path, State) ->
             size(Datum)
     end.
 
+atime(_Path, _State) ->
+    {{1969,12,31},{00,00,00}}.
+
+mtime(_Path, _State) ->
+    {{1969,12,31},{00,00,00}}.
+
+
 resize(_Path, NewSize, _State) ->
     NewSize.
 
@@ -103,7 +111,11 @@ setattr(Path, Stat, Attr, ToSet, State) ->
 
 getattr(Path,State) ->
     Size = amqpfs_provider:call_module(size, [Path, State], State),
-    #stat{ st_size = Size }.
+    ATime = amqpfs_util:datetime_to_unixtime(amqpfs_provider:call_module(atime, [Path, State], State)),
+    MTime = amqpfs_util:datetime_to_unixtime(amqpfs_provider:call_module(mtime, [Path, State], State)),
+    #stat{ st_atime = ATime,
+           st_mtime = MTime,
+           st_size = Size }.
 
 handle_info(_Msg, _State) ->
     ignore.
