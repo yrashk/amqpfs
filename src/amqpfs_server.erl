@@ -157,12 +157,6 @@ handle_info({#'basic.deliver'{consumer_tag=ConsumerTag, delivery_tag=_DeliveryTa
 handle_info (_Msg, State) -> { noreply, State }.
 terminate (_Reason, _State) -> ok.
 
--define (DIRATTR (X), #stat{ st_ino = (X), 
-                             st_mode = ?S_IFDIR bor 8#0555, 
-                             st_nlink = 1 }).
--define (LINKATTR, #stat{ st_mode = ?S_IFLNK bor 8#0555, st_nlink = 1 }).
-
-
 handle_command({announce, directory, {Path, Contents}}, State) ->
     {_, State1} = make_inode(Path, {directory, Contents}, State),
     State1;
