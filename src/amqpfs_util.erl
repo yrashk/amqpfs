@@ -85,5 +85,7 @@ decode_payload(ContentType, Payload) ->
             binary_to_term(Payload) % by default, attempt BERT, but FIXME: it might be a bad idea in a long run
     end.
 
+-define(EPOCH_START, {{1970,1,1},{0,0,0}}).
+
 datetime_to_unixtime(DateTime) ->
-    calendar:datetime_to_gregorian_seconds(DateTime)-calendar:datetime_to_gregorian_seconds({{1970,1,1},{0,0,0}}).
+    calendar:datetime_to_gregorian_seconds(DateTime)-calendar:datetime_to_gregorian_seconds(?EPOCH_START).
