@@ -178,7 +178,7 @@ getattr(Ctx, Ino, Cont, State) ->
                end),
     { noreply, State }.
 
-getattr_async(_Ctx, Ino, Cont, State) ->
+getattr_async(Ctx, Ino, Cont, State) ->
     Result =
     case ets:lookup(State#amqpfs.inodes, Ino) of
         [{Ino, Path}] ->
@@ -186,7 +186,7 @@ getattr_async(_Ctx, Ino, Cont, State) ->
                 [{Path, { Ino, {directory, _} } }] ->
                     #fuse_reply_attr{ attr = ?DIRATTR (Ino), attr_timeout_ms = 1000 };
                 [{Path, { Ino, {file, on_demand} } }] ->
-                    case remote_getattr(Path, State) of
+                    case remote_getattr(Path, Ctx, State) of
                         #stat{}=Stat -> #fuse_reply_attr{ attr = Stat, attr_timeout_ms = 1000 };
                         Err -> #fuse_reply_err { err = Err}
                     end;
@@ -209,7 +209,7 @@ lookup(Ctx, ParentIno, BinPath, Cont, State) ->
                end),
     { noreply, State }.
 
-lookup_async(_Ctx, ParentIno, BinPath, Cont, State) ->
+lookup_async(Ctx, ParentIno, BinPath, Cont, State) ->
     case ets:lookup(State#amqpfs.inodes, ParentIno) of
         [{ParentIno,Path}] ->
             Path1 = case Path of
@@ -219,13 +219,13 @@ lookup_async(_Ctx, ParentIno, BinPath, Cont, State) ->
             Result =
             case ets:lookup(State#amqpfs.names, Path) of
                 [{Path, { ParentIno, {directory, on_demand}}}] ->
-                    Response = remote_list_dir(Path, State),
+                    Response = remote_list_dir(Path, Ctx, State),
                     List = lists:map(fun ({P,E}) -> 
                                              Path2 = Path1 ++ "/" ++ P,
                                              {_Ino, _} = make_inode(Path2, E, State),
                                              P
                                      end, Response),
-                    lookup_impl(BinPath, Path1, List, State);
+                    lookup_impl(BinPath, Path1, List, Ctx, State);
                 _ ->
                     #fuse_reply_err{ err = enoent }
             end,
@@ -234,13 +234,13 @@ lookup_async(_Ctx, ParentIno, BinPath, Cont, State) ->
             fuserlsrv:reply (Cont, #fuse_reply_err{ err = enoent })
     end.
 
-lookup_impl(BinPath, Path, List, State) ->
+lookup_impl(BinPath, Path, List, Ctx, State) ->
     case lists:any(fun (P) -> P == BinPath end,  lists:map(fun erlang:list_to_binary/1, List)) of
         true -> % there is something
             Path2 = Path ++ "/" ++ binary_to_list(BinPath),
             case ets:lookup(State#amqpfs.names, Path2) of
                 [{Path2, {Ino, _}}] ->
-                    Stat = remote_getattr(Path2, State),
+                    Stat = remote_getattr(Path2, Ctx, State),
                     #fuse_reply_entry{ 
                                        fuse_entry_param = #fuse_entry_param{ ino = Ino,
                                                                              generation = 1,  % (?)
@@ -263,11 +263,11 @@ opendir(Ctx, Ino, Fi, Cont, State) ->
     spawn_link (fun () -> open_async(Ctx, Ino, Fi, Cont, State) end),
     { noreply, State }.
 
-open_async(_Ctx, Ino, Fi, Cont, State) ->
+open_async(Ctx, Ino, Fi, Cont, State) ->
     Result =
     case ets:lookup(State#amqpfs.inodes, Ino) of
         [{Ino,Path}] ->
-            Response = remote(Path, {open, Path, Fi}, State),
+            Response = remote(Path, {open, Path, Fi}, Ctx, State),
             case Response of
                 ok -> #fuse_reply_open{fuse_file_info = Fi};
                 enoent -> #fuse_reply_err { err = enoent};
@@ -289,11 +289,11 @@ read(Ctx, Ino, Size, Offset, Fi, Cont, State) ->
                end),
     { noreply, State }.
 
-read_async(_Ctx, Ino, Size, Offset, _Fi, Cont, State) ->
+read_async(Ctx, Ino, Size, Offset, _Fi, Cont, State) ->
     Result =
     case ets:lookup(State#amqpfs.inodes, Ino) of
         [{Ino,Path}] ->
-            Response = remote(Path, {read, Path, Size, Offset}, State),
+            Response = remote(Path, {read, Path, Size, Offset}, Ctx, State),
             case Response of
                 Buf when is_binary(Buf), size(Buf) =< Size -> #fuse_reply_buf{ size = size(Buf), buf = Buf };
                 eio -> #fuse_reply_err { err = eio};
@@ -315,7 +315,7 @@ readdir(Ctx, Ino, Size, Offset, Fi, Cont, State) ->
                end),
     { noreply, State }.
 
-readdir_async(_Ctx, Ino, Size, Offset, _Fi, Cont, #amqpfs{}=State) ->
+readdir_async(Ctx, Ino, Size, Offset, _Fi, Cont, #amqpfs{}=State) ->
     {Contents, _} =
         case ets:lookup(State#amqpfs.inodes, Ino) of
             [{Ino,Path}] ->
@@ -325,13 +325,13 @@ readdir_async(_Ctx, Ino, Size, Offset, _Fi, Cont, #amqpfs{}=State) ->
                         end,
                 case ets:lookup(State#amqpfs.names, Path) of
                     [{Path, { Ino, {directory, on_demand}}}] ->
-                        Response = remote_list_dir(Path, State),
+                        Response = remote_list_dir(Path, Ctx, State),
                         lists:foldl(fun ({P, E}, {L, Acc}) -> 
                                             Path2 = Path1 ++ "/" ++ P,
                                             make_inode(Path2, E, State),
                                             case ets:lookup(State#amqpfs.names, Path2) of                      
                                                 [{Path2, {_ChildIno, _}}] ->
-                                                    Stat = remote_getattr(Path2, State),
+                                                    Stat = remote_getattr(Path2, Ctx, State),
                                                     {L ++ [#direntry{ name = P, offset = Acc, stat = Stat }], Acc + 1};
                                                 _ ->
                                                     {L, Acc}
@@ -376,11 +376,11 @@ write(Ctx, Ino, Data, Offset, Fi, Cont, State) ->
                end),
     { noreply, State }.
 
-write_async(_Ctx, Ino, Data, Offset, _Fi, Cont, State) ->
+write_async(Ctx, Ino, Data, Offset, _Fi, Cont, State) ->
     Result =
     case ets:lookup(State#amqpfs.inodes, Ino) of
         [{Ino,Path}] ->
-            Response = remote(Path, {write, Path, Data, Offset}, State),
+            Response = remote(Path, {write, Path, Data, Offset}, Ctx, State),
             case Response of
                 Count when is_integer(Count) -> #fuse_reply_write{ count = Count };
                 eio -> #fuse_reply_err { err = eio};
@@ -504,11 +504,11 @@ release(Ctx, Ino, Fi, Cont, State) ->
        end),
     { noreply, State }.
 
-release_async(_Ctx, Ino, Fi, Cont, State) ->
+release_async(Ctx, Ino, Fi, Cont, State) ->
     Result =
         case ets:lookup(State#amqpfs.inodes, Ino) of
             [{Ino,Path}] ->
-                Response = remote(Path, {release, Path, Fi}, State),
+                Response = remote(Path, {release, Path, Fi}, Ctx, State),
                 case Response of
                     ok -> #fuse_reply_err{ err = ok };
                     eio -> #fuse_reply_err { err = eio};
@@ -551,13 +551,13 @@ setattr(Ctx, Ino, Attr, ToSet, Fi, Cont, State) ->
     spawn_link(fun () -> setattr_async(Ctx, Ino, Attr, ToSet, Fi, Cont, State) end),
     { noreply, State }.
 
-setattr_async(_Ctx, Ino, Attr, ToSet, _Fi, Cont, State) ->
+setattr_async(Ctx, Ino, Attr, ToSet, _Fi, Cont, State) ->
     Result = 
     case ets:lookup(State#amqpfs.inodes, Ino) of
         [{Ino,Path}] ->
-            case remote_getattr(Path, State) of
+            case remote_getattr(Path, Ctx, State) of
                 #stat{}=Stat -> 
-                    Stat1 = remote_setattr(Path, Stat, Attr, ToSet, State),
+                    Stat1 = remote_setattr(Path, Stat, Attr, ToSet, Ctx, State),
                     #fuse_reply_attr{ attr = Stat1 , attr_timeout_ms = 1000 };
                 Err -> #fuse_reply_err { err = Err}
             end;
@@ -621,11 +621,11 @@ register_response_route(#amqpfs{response_routes=Tab}) ->
 unregister_response_route(Route, #amqpfs{response_routes=Tab}) ->
     ets:delete(Tab, Route).
             
-remote_list_dir(Path, State) ->
-    remote(Path, {list_dir, Path}, State).
+remote_list_dir(Path, Ctx, State) ->
+    remote(Path, {list_dir, Path}, Ctx, State).
 
-remote_getattr(Path, State) ->
-    Stat0 = remote(Path, {getattr, Path}, State),
+remote_getattr(Path, Ctx, State) ->
+    Stat0 = remote(Path, {getattr, Path}, Ctx, State),
     case ets:lookup (State#amqpfs.names, Path) of
         [{Path, {Ino, {directory, on_demand}}}] ->
             % FIXME: shouldn't we assign executability if only this item is readable for particular category (owner/group/other)?
@@ -636,10 +636,10 @@ remote_getattr(Path, State) ->
             Stat0
     end.
 
-remote_setattr(Path, Stat, Attr, ToSet, State) ->
-    remote(Path, {setattr, Path, Stat, Attr, ToSet}, State).
+remote_setattr(Path, Stat, Attr, ToSet, Ctx, State) ->
+    remote(Path, {setattr, Path, Stat, Attr, ToSet}, Ctx, State).
 
-remote(Path, Command, #amqpfs{response_cache = Tab}=State) ->
+remote(Path, Command, Ctx, #amqpfs{response_cache = Tab}=State) ->
     case ets:lookup(Tab, Command) of
         [{Command, _, -1, CachedData}] ->
             CachedData;
@@ -650,16 +650,16 @@ remote(Path, Command, #amqpfs{response_cache = Tab}=State) ->
                     CachedData;
                 true ->
                     ets:delete(Tab, Command),
-                    remote_impl(Path, Command, State)
+                    remote_impl(Path, Command, Ctx, State)
             end;
         [] ->
-            remote_impl(Path, Command, State)
+            remote_impl(Path, Command, Ctx, State)
     end.
 
-remote_impl(Path, Command, #amqpfs{amqp_channel = Channel, response_cache = Tab}=State) ->
+remote_impl(Path, Command, Ctx, #amqpfs{amqp_channel = Channel, response_cache = Tab}=State) ->
     Route = register_response_route(State),
     amqp_channel:call(Channel, #'basic.publish'{exchange = <<"amqpfs">>, routing_key = amqpfs_util:path_to_routing_key(Path)}, 
-                      {amqp_msg, #'P_basic'{message_id = Route, headers = env_headers(State)}, term_to_binary(Command)}),
+                      {amqp_msg, #'P_basic'{message_id = Route, headers = env_headers(State) ++ ctx_headers(Ctx) }, term_to_binary(Command)}),
     Response = 
         receive 
             {response, Data, 0} ->
@@ -680,4 +680,7 @@ env_headers(_State) ->
     [{"node", longstr, atom_to_list(node())},
      {"hostname", longstr, Hostname}].
 
-
+ctx_headers(#fuse_ctx{uid = UID, gid = GID, pid = PID}) ->
+    [{"uid", long, UID},
+     {"gid", long, GID},
+     {"pid", long, PID}].

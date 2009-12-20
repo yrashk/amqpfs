@@ -9,6 +9,7 @@
          append/3,
          write/4, output/4,
          readable/3, writable/3, executable/3,
+         uid/2, gid/2,
          handle_info/2,
          ttl/2,
          allow_request/1]).
@@ -85,6 +86,15 @@ writable(_Path, _Group, _State) ->
 executable(_Path, _Group, _State) ->
     false.
 
+uid(_, #amqpfs_provider_state{ request_headers = Headers }) ->
+    {value, {<<"uid">>, _, Val}} = lists:keysearch(<<"uid">>, 1, Headers),
+    Val.
+
+gid(_, #amqpfs_provider_state{ request_headers = Headers }) ->
+    {value, {<<"gid">>, _, Val}} = lists:keysearch(<<"gid">>, 1, Headers),
+    Val.
+
+
 resize(_Path, NewSize, _State) ->
     NewSize.
 
@@ -149,10 +159,14 @@ getattr(Path,State) ->
         (mode(readable(Path, other, State), ?S_IROTH) bor
          mode(writable(Path, other, State), ?S_IWOTH) bor
          mode(executable(Path, other, State), ?S_IXOTH)),
+    UID = amqpfs_provider:call_module(uid, [Path, State], State),
+    GID = amqpfs_provider:call_module(gid, [Path, State], State),
     #stat{ st_atime = ATime,
            st_mtime = MTime,
            st_size = Size,
-           st_mode = Mode
+           st_mode = Mode,
+           st_uid = UID,
+           st_gid = GID
          }.
 
 handle_info(_Msg, _State) ->
