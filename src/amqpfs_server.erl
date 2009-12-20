@@ -624,7 +624,7 @@ remote_getattr(Path, Ctx, State) ->
             % FIXME: shouldn't we assign executability if only this item is readable for particular category (owner/group/other)?
             Stat0#stat{ st_mode = ?S_IFDIR bor Stat0#stat.st_mode bor ?S_IXUSR bor ?S_IXGRP bor ?S_IXOTH, st_ino = Ino, st_nlink = NLink};
         [{Path, {Ino, {file, on_demand}}}] ->
-            Stat0#stat{ st_mode = ?S_IFREG bor Stat0#stat.st_mode, st_ino = Ino };
+            Stat0#stat{ st_mode = ?S_IFREG bor Stat0#stat.st_mode, st_ino = Ino, st_nlink = 1 };
         [] ->
             Stat0
     end.
