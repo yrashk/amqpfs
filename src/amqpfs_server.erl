@@ -193,6 +193,7 @@ getattr_async(Ctx, Ino, Cont, State) ->
                 _ ->
                     #fuse_reply_err{ err = enoent }
             end;
+
         _ ->
             #fuse_reply_err{ err = enoent }
     end,
@@ -339,9 +340,8 @@ readdir_async(Ctx, Ino, Size, Offset, _Fi, Cont, #amqpfs{}=State) ->
                                     end, {[],3},  Response);
                     _ ->
                         {[], 3}
-                end;
-            _ ->
-                {[], 3}
+                end
+                % according to FuseInvariants wiki page on FUSE, readdir() is only called with an existing directory name, so there is no other clause in this case
         end,
     DirEntryList = 
         take_while 
@@ -357,8 +357,8 @@ readdir_async(Ctx, Ino, Size, Offset, _Fi, Cont, #amqpfs{}=State) ->
            { 0, Size },
            lists:nthtail 
            (Offset,
-            [ #direntry{ name = ".", offset = 1, stat = ?DIRATTR (Ino) },
-              #direntry{ name = "..", offset = 2, stat = ?DIRATTR (Ino) }
+            [ #direntry{ name = ".", offset = 1, stat = remote_getattr(Path, Ctx, State) },
+              #direntry{ name = "..", offset = 2, stat = remote_getattr(filename:dirname(Path), Ctx, State) }
              ] ++ Contents)),
     fuserlsrv:reply (Cont, #fuse_reply_direntrylist{ direntrylist = DirEntryList }).
 
