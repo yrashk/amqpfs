@@ -51,35 +51,33 @@ handle_info_async({#'basic.deliver'{consumer_tag=_ConsumerTag, delivery_tag=_Del
         _ ->
             case Command of
                 {list_dir, Path} ->
-                    spawn(fun () -> send_response(MessageId, ?CONTENT_TYPE_BERT, [ttl(Path, ReqState)], term_to_binary(call_module(list_dir,[Path, ReqState], ReqState)), ReqState) end);
+                    send_response(MessageId, ?CONTENT_TYPE_BERT, [ttl(Path, ReqState)], term_to_binary(call_module(list_dir,[Path, ReqState], ReqState)), ReqState);
                 {open, Path, Fi} ->
-                    spawn(fun () -> send_response(MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(open, [Path, Fi, ReqState], ReqState)), ReqState) end);
+                    send_response(MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(open, [Path, Fi, ReqState], ReqState)), ReqState);
                 {read, Path, Size, Offset} ->
-                    spawn(fun () -> 
-                                  {ResultContentType, Result} = 
-                                      case call_module(read, [Path, Size, Offset, ReqState], ReqState) of
-                                          Datum when is_binary(Datum) ->
-                                              {?CONTENT_TYPE_BIN, Datum};
-                                          Datum ->
-                                              {?CONTENT_TYPE_BERT, term_to_binary(Datum)}
-                                      end,
-                                  send_response(MessageId, ResultContentType, [ttl(Path, ReqState)], Result, ReqState)
-                          end);
+                    {ResultContentType, Result} = 
+                        case call_module(read, [Path, Size, Offset, ReqState], ReqState) of
+                            Datum when is_binary(Datum) ->
+                                {?CONTENT_TYPE_BIN, Datum};
+                            Datum ->
+                                {?CONTENT_TYPE_BERT, term_to_binary(Datum)}
+                        end,
+                    send_response(MessageId, ResultContentType, [ttl(Path, ReqState)], Result, ReqState);
                 {write, Path, Data, Offset} ->
-                    spawn(fun () -> send_response(MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(output, [Path, Data, Offset, ReqState], ReqState)), ReqState) end);
+                    send_response(MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(output, [Path, Data, Offset, ReqState], ReqState)), ReqState);
                 {getattr, Path} ->
-                    spawn(fun () -> send_response(MessageId, ?CONTENT_TYPE_BERT, [ttl(Path, ReqState)], term_to_binary(call_module(getattr, [Path, ReqState], ReqState)), ReqState) end);
+                    send_response(MessageId, ?CONTENT_TYPE_BERT, [ttl(Path, ReqState)], term_to_binary(call_module(getattr, [Path, ReqState], ReqState)), ReqState);
                 {setattr, Path, Stat, Attr, ToSet} ->
-                    spawn(fun () -> send_response(MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(setattr, [Path, Stat, Attr, ToSet, ReqState], ReqState)), ReqState) end);
+                    send_response(MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(setattr, [Path, Stat, Attr, ToSet, ReqState], ReqState)), ReqState);
                 {release, Path, Fi} ->
-                    spawn(fun () -> send_response(MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(release, [Path, Fi, ReqState], ReqState)), ReqState) end); 
+                    send_response(MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(release, [Path, Fi, ReqState], ReqState)), ReqState); 
                 _ ->
                     ignore
             end
     end;
 
 handle_info_async(Msg, State) ->
-    spawn(fun () -> call_module(handle_info, [Msg, State], State) end).
+    call_module(handle_info, [Msg, State], State).
 
 code_change(_OldVsn, State, _Extra) ->
     State.
