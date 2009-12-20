@@ -20,14 +20,14 @@ list_dir("/mq/exchanges/" ++ _Exchange, _State) ->
     [{"type", {file, on_demand}}].
 
 object("/mq/exchanges/" ++ ExchangeKey, State) ->
-    case string:tokens(ExchangeKey,"/") of
-        [Exchange, "type"] ->
-            ExchangeBin = list_to_binary(Exchange),
-            [ExchangePropList] = lists:filter(fun (PropList) -> proplists:get_value(name, PropList) == {resource,<<"/">>,exchange,ExchangeBin} end, exchanges([name,type], State)),
-            atom_to_list(proplists:get_value(type, ExchangePropList));
-        _ ->
-            <<>>
-    end.
+    render_exchange(string:tokens(ExchangeKey,"/"), State).
+
+render_exchange([Exchange, "type"], State) ->
+    ExchangeBin = list_to_binary(Exchange),
+    [ExchangePropList] = lists:filter(fun (PropList) -> proplists:get_value(name, PropList) == {resource,<<"/">>,exchange,ExchangeBin} end, exchanges([name,type], State)),
+    atom_to_list(proplists:get_value(type, ExchangePropList));
+render_exchange(_, State) ->
+    <<>>.
 
 exchanges(Info, #amqpfs_provider_state{ args = Args } = _State) ->
     Exchanges = rpc:call(proplists:get_value(amqp_broker_node, Args), rabbit_exchange, info_all, [<<"/">>,Info]),
