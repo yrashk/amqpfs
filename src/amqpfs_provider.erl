@@ -154,8 +154,10 @@ call_module(F, A, #amqpfs_provider_state{ module = Module }) ->
 
 call_module(F, A, Module) when is_atom(Module) ->
     case (catch apply(Module, F, A))  of
-        {'EXIT', {Reason, _}} when Reason == badarg; Reason == undef; Reason == function_clause ->
+        {'EXIT', {Reason, [{Module, F, A}|_]}} when Reason == badarg; Reason == undef; Reason == function_clause ->
             call_module(F, A, amqpfs_provider_base);
+        {'EXIT', {Reason, Trace}} ->
+            error_logger:format("An error occured in AMQPFS provider ~p:~n  Reason: ~p~n  Trace: ~p~n",[Module, Reason, Trace]);
         Result ->
             Result
     end.
