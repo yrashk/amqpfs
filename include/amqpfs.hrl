@@ -9,6 +9,7 @@
 -record(amqpfs_provider_state,
         {
           module,
+          args = [],
           connection,
           channel,
           request_headers,

@@ -1,6 +1,6 @@
 -module(mq_amqpfs_provider). 
 
--export([init/1, list_dir/2, open/3, getattr/2]).
+-export([init/1, list_dir/2, object/2]).
 
 -include_lib("amqpfs/include/amqpfs.hrl").
 
@@ -12,15 +12,24 @@ init(State) ->
 list_dir("/mq", _State) ->
     [{"exchanges", {directory, on_demand}}];
 
-list_dir("/mq/exchanges", _State) ->
-    Exchanges = rpc:call('rabbit@hq', rabbit_exchange, info_all, [<<"/">>,[name]]),
-    lists:filter(fun ({Name, _}) -> Name /= [] end, lists:map(fun ([{name, {resource, _, exchange, BinName}}]) -> {binary_to_list(BinName), {directory, on_demand}} end, Exchanges)).
-    
-open(_, _Fi, _State) ->
-    ok.
+list_dir("/mq/exchanges", State) ->
+    lists:map(fun ([{name, {resource, _, exchange, BinName}}]) -> {binary_to_list(BinName), {directory, on_demand}} end, exchanges([name], State));
 
 
-getattr("/mq/exchanges",_State) ->
-    #stat{ st_mode = ?S_IFDIR bor 8#0555, 
-           st_nlink = 1,
-           st_size = 0 }.
+list_dir("/mq/exchanges/" ++ _Exchange, _State) ->
+    [{"type", {file, on_demand}}].
+
+object("/mq/exchanges/" ++ ExchangeKey, State) ->
+    case string:tokens(ExchangeKey,"/") of
+        [Exchange, "type"] ->
+            ExchangeBin = list_to_binary(Exchange),
+            [ExchangePropList] = lists:filter(fun (PropList) -> proplists:get_value(name, PropList) == {resource,<<"/">>,exchange,ExchangeBin} end, exchanges([name,type], State)),
+            atom_to_list(proplists:get_value(type, ExchangePropList));
+        _ ->
+            <<>>
+    end.
+
+exchanges(Info, #amqpfs_provider_state{ args = Args } = _State) ->
+    Exchanges = rpc:call(proplists:get_value(amqp_broker_node, Args), rabbit_exchange, info_all, [<<"/">>,Info]),
+    lists:filter(fun (PropList) -> proplists:get_value(name, PropList) =/= {resource,<<"/">>,exchange,<<>>} end, Exchanges).
+

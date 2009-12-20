@@ -3,7 +3,7 @@
 
 -export([behaviour_info/1]).
 
--export([start/1]).
+-export([start/1, start/2]).
 
 -export([init/1, handle_info/2, handle_call/3, handle_cast/2, code_change/3, terminate/2]).
 
@@ -18,10 +18,13 @@ behaviour_info(callbacks) ->
      ].
 
 start(Module) ->
-    gen_server:start(?MODULE, [Module], []).
+    start(Module, []).
 
-init([Module]) ->
-    State0 = #amqpfs_provider_state{ module = Module },
+start(Module, Args) ->
+    gen_server:start(?MODULE, [Module, Args], []).
+
+init([Module, Args]) ->
+    State0 = #amqpfs_provider_state{ module = Module, args = Args },
     State1 = setup(State0),
     State2 = call_module(init, [State1], State1),
     {ok, State2}.
