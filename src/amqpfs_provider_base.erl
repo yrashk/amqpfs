@@ -6,7 +6,8 @@
          read/4, getattr/2, setattr/5,
          object/2, size/2, resize/3,
          atime/2, mtime/2,
-         write/4,
+         append/3,
+         write/4, output/4,
          handle_info/2,
          ttl/2,
          allow_request/1]).
@@ -43,8 +44,19 @@ read(Path, Size, Offset, State) ->
     {Result2, _} = split_binary(Result1, ProperSize),
     Result2.
 
+append(_Path, _Data, _State) ->
+    eio. % we do not know what to do with appending by default
+
 write(_Path, _Data, _Offset, _State) ->
-    eio.
+    eio. % we do not know what to do with it
+
+output(Path, Data, Offset, State) ->
+    Size = amqpfs_provider:call_module(size, [Path, State], State),
+    if Size == Offset ->
+            amqpfs_provider:call_module(append, [Path, Data, State], State);
+       true -> 
+            amqpfs_provider:call_module(write, [Path, Data, Offset, State], State)
+    end.
 
 object(_Path, _State) ->
     <<>>.

@@ -1,6 +1,6 @@
 -module(simple_amqpfs_provider). 
 
--export([init/1, list_dir/2, open/3, resize/3, write/4, object/2, atime/2, mtime/2, ttl/2]).
+-export([init/1, list_dir/2, open/3, resize/3, append/3, write/4, object/2, atime/2, mtime/2, ttl/2]).
 
 -include_lib("amqpfs/include/amqpfs.hrl").
 
@@ -24,9 +24,15 @@ resize("/simple_on_demand/bogus", NewSize, _State) ->
     io:format("Resizing to ~p~n",[NewSize]),
     NewSize.
 
+
+append("/simple_on_demand/bogus", Data, _State) ->
+    io:format("Appending with ~p~n",[binary_to_list(Data)]),
+    size(Data).
+                
 write("/simple_on_demand/bogus", Data, Offset, _State) ->
     io:format("Writing ~p at ~p~n",[binary_to_list(Data), Offset]),
     size(Data).
+                                           
     
 -define(BOGUS_CONTENT, "This is a bogus file. Hello!" ++ [10]).
 
