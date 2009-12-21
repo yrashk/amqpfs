@@ -1,6 +1,5 @@
 -module(amqpfs_response_policy).
 -export([first/3, all/3]).
--export([new/1]).
 
 -include_lib("amqpfs/include/amqpfs.hrl").
 
@@ -33,9 +32,3 @@ all(Route, _Response, #amqpfs{ response_routes = Routes, response_buffers = Resp
         _ ->
             ignore
     end.
-    
-    
-%%
-
-new(PropList) ->
-    lists:ukeysort(1,PropList ++ ?DEFAULT_RESPONSE_POLICIES).

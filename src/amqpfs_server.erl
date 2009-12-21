@@ -177,7 +177,7 @@ terminate (_Reason, _State) -> ok.
 handle_command({announce, directory, {Path, Contents}}, #amqpfs{ announcements = Announcements} = State) ->
     {_, State1} = make_inode(Path, {directory, Contents}, State),
     ets:insert(Announcements, {Path, {directory, Contents}}),
-    set_new_response_policies(Path, ?DEFAULT_RESPONSE_POLICIES, State),
+    set_new_response_policies(Path, amqpfs_response_policies:new(), State),
     State1;
 
 handle_command({cancel, directory, _Path}, State) ->
