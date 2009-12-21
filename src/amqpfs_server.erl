@@ -4,6 +4,7 @@
 -export ([ code_change/3,
            handle_info/2,
            init/1,
+           set_response_policies/2,
            path_to_announced/2,
            terminate/2,
            getattr/4,
@@ -56,7 +57,7 @@ start_link (LinkedIn, Dir) ->
     start_link (LinkedIn, Dir, "").
 
 start_link (LinkedIn, Dir, MountOpts) ->
-    fuserlsrv:start_link (?MODULE, LinkedIn, MountOpts, Dir, [], []).
+    fuserlsrv:start_link({local, amqpfs}, ?MODULE, LinkedIn, MountOpts, Dir, [], []).
 
 %-=====================================================================-
 %-                           fuserl callbacks                          -
@@ -188,6 +189,9 @@ set_new_response_policies(Path, Policies, #amqpfs{ response_policies = ResponseP
 
 set_response_policies(Path, Policies, #amqpfs{ response_policies = ResponsePolicies } = _State) ->
     ets:insert(ResponsePolicies, {Path, Policies}).
+
+set_response_policies(Path, Policies) ->
+    amqpfs ! {set_response_policies, Path, Policies}.
 
 get_response_policy(Path, Command, #amqpfs{ response_policies = ResponsePolicies } = State) ->
     case ets:lookup(ResponsePolicies, Path) of
