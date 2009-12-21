@@ -26,8 +26,8 @@
                    response_buffers,
                    amqp_conn, amqp_channel, amqp_consumer_tag, amqp_response_consumer_tag }).
 
--define(DEFAULT_RESPONSE_POLICY, {amqpfs_response_policy, first}).
--define(DEFAULT_RESPONSE_AGGREGATION, {amqpfs_response_aggregation, first}).
+-define(DEFAULT_RESPONSE_POLICY, first).
+-define(DEFAULT_RESPONSE_AGGREGATION, first).
 
 -define(DEFAULT_RESPONSE_POLICIES,
         [{list_dir, ?DEFAULT_RESPONSE_POLICY, ?DEFAULT_RESPONSE_AGGREGATION},

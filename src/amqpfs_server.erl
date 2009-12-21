@@ -4,7 +4,7 @@
 -export ([ code_change/3,
            handle_info/2,
            init/1,
-           set_response_policies/3,
+           path_to_announced/2,
            terminate/2,
            getattr/4,
            lookup/5,
@@ -113,7 +113,7 @@ init ([]) ->
                      response_routes = ets:new(response_routes, [public, set]),
                      response_cache = ets:new(response_cache, [public, set]),
                      response_policies = ets:new(response_policies, [public, set]),
-                     response_buffers = ets:new(response_buffers, [public, bag]),
+                     response_buffers = ets:new(response_buffers, [public, duplicate_bag]),
                      amqp_conn = AmqpConn,
                      amqp_channel = AmqpChannel,
                      amqp_consumer_tag = ConsumerTag,
@@ -139,17 +139,19 @@ handle_info({#'basic.deliver'{consumer_tag=ConsumerTag, delivery_tag=_DeliveryTa
     ets:insert(ResponseBuffers, {Route, Response, TTL}),
     case ets:lookup(Tab, Route) of 
         [{Route, Pid, Path, Command}] ->
-            {{PolicyM, PolicyF}, {AggregatorM, AggregatorF}} = get_response_policy(Path, Command, State),
-            case apply(PolicyM, PolicyF, [Response, State]) of
+            {PolicyF, AggregatorF} = get_response_policy(Path, Command, State),
+            case apply(amqpfs_response_policy, PolicyF, [Route, Response, State]) of
                 last_response ->
                     Responses = ets:lookup(ResponseBuffers, Route),
                     ets:delete(ResponseBuffers, Route),
-                    {ResponseToSend, TTLToSend} = apply(AggregatorM, AggregatorF, [lists:map(fun ({_, ResponseA, TTLA}) -> {ResponseA, TTLA} end, Responses)]),
+                    unregister_response_route(Route, State), % it is pretty safe to assume that there are no more messages to deliver
+                    {ResponseToSend, TTLToSend} = apply(amqpfs_response_aggregation, AggregatorF, [lists:map(fun ({_, ResponseA, TTLA}) -> {ResponseA, TTLA} end, Responses)]),
                     Pid ! {response, ResponseToSend, TTLToSend};
                 _ ->
                     continue
             end;
         _ ->
+            ets:delete(ResponseBuffers, Route),
             discard
     end,
     {noreply, State};
@@ -162,17 +164,27 @@ handle_info({#'basic.deliver'{consumer_tag=ConsumerTag, delivery_tag=_DeliveryTa
     Command = amqpfs_util:decode_payload(ContentType, Payload),
     {noreply, handle_command(Command, State)};
 
+handle_info({set_response_policies, Path, Policies}, State) ->
+    set_response_policies(Path, Policies, State),
+    {noreply, State};
+    
+
 handle_info (_Msg, State) -> { noreply, State }.
+
 terminate (_Reason, _State) -> ok.
 
 handle_command({announce, directory, {Path, Contents}}, #amqpfs{ announcements = Announcements} = State) ->
     {_, State1} = make_inode(Path, {directory, Contents}, State),
     ets:insert(Announcements, {Path, {directory, Contents}}),
-    set_response_policies(Path, ?DEFAULT_RESPONSE_POLICIES, State),
+    set_new_response_policies(Path, ?DEFAULT_RESPONSE_POLICIES, State),
     State1;
 
 handle_command({cancel, directory, _Path}, State) ->
     State.
+
+
+set_new_response_policies(Path, Policies, #amqpfs{ response_policies = ResponsePolicies } = _State) ->
+    ets:insert_new(ResponsePolicies, {Path, Policies}).
 
 set_response_policies(Path, Policies, #amqpfs{ response_policies = ResponsePolicies } = _State) ->
     ets:insert(ResponsePolicies, {Path, Policies}).
@@ -637,6 +649,19 @@ make_inode(Name,Extra, State) ->
           ets:insert (State#amqpfs.names, {Name, {Id, Extra}}),
           { Id, State }
   end.
+
+path_to_announced(Path, #amqpfs{ announcements = Announcements }=State) ->
+    case ets:lookup(Announcements, Path) of
+        [] ->
+            path_to_announced(filename:dirname(Path), State);
+        [{Path, _}] ->
+            Path;
+        Paths when is_list(Paths) andalso length(Paths) > 1 ->
+            % that's a bag
+            {Path, _} = hd(Paths),
+            Path
+    end.
+
 
 register_response_route(Path, Command, #amqpfs{response_routes=Tab}) ->
     Route = list_to_binary(lists:flatten(io_lib:format("~w",[now()]))),
