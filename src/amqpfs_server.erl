@@ -425,40 +425,27 @@ listxattr_async(_Ctx, _Ino, _Size, Cont, _State) ->
 
 
 mknod(Ctx, ParentIno, Name, Mode, Dev, Cont, State) ->
-    case Mode band ?S_IFMT of
-        N when ((N =:= ?S_IFLNK) or 
-                (N =:= ?S_IFREG) or 
-                (N =:= ?S_IFDIR)) ->
-            spawn_link 
-              (fun () -> 
-                       mknod_async(Ctx, ParentIno, Name, Mode, Dev, Cont, State) 
-               end),
-      { noreply, State };
+    spawn_link 
+      (fun () -> 
+               mknod_async(Ctx, ParentIno, Name, Mode, Dev, Cont, State) 
+       end).
+
+mknod_async(Ctx, ParentIno, Name, Mode, _Dev, Cont, State) ->
+    Result = 
+    case ets:lookup(State#amqpfs.inodes, ParentIno) of
+        [{ParentIno,Path}] ->
+            case remote(Path, {create, Path, Name}, Ctx, State) of
+                ok ->
+                    remote_setattr(Path, remote_getattr(Path, Ctx, State), #stat{ st_mode = Mode }, ?FUSE_SET_ATTR_MODE, Ctx, State),
+                    ok;
+                Err ->
+                    #fuse_reply_err { err = Err }
+            end;
         _ ->
-            { #fuse_reply_err{ err = enotsup }, State }
-    end.
+            #fuse_reply_err{ err = enoent }
+    end,
+    fuserlsrv:reply(Cont, Result).   
 
-
-mknod_async(Ctx, _ParentIno, _Name, Mode, _Dev, Cont, _State) ->
-    { Mega, Sec, _ } = erlang:now(),
-    Now = 1000000 * Mega + Sec,
-    Stat = #stat{ st_ino = amqpfs_inode:alloc(),
-                  st_mode = Mode,
-                  st_uid = Ctx#fuse_ctx.uid,
-                  st_gid = Ctx#fuse_ctx.gid,
-                  st_atime = Now,
-                  st_mtime = Now,
-                  st_ctime = Now },
-    Param = #fuse_entry_param{ 
-                  ino = Stat#stat.st_ino,
-                  generation = 1,
-                  attr = Stat#stat{ st_nlink = 1 },
-                  attr_timeout_ms = 
-                  100,
-                  entry_timeout_ms = 
-                  100
-                 },
-    fuserlsrv:reply(Cont, #fuse_reply_entry{ fuse_entry_param = Param }).
 
 create(Ctx, ParentIno, Name, Mode, Fi, Cont, State) ->
     spawn_link 
@@ -486,27 +473,6 @@ create_async(Ctx, ParentIno, Name, Mode, Fi, Cont, State) ->
             #fuse_reply_err{ err = enoent }
     end,
     fuserlsrv:reply(Cont, Result).   
-
-%    { Mega, Sec, _ } = erlang:now(),
-%    Now = 1000000 * Mega + Sec,
-%    Stat = #stat{ st_ino = amqpfs_inode:alloc(),
-%                  st_mode = Mode,
-%                  st_uid = Ctx#fuse_ctx.uid,
-%                  st_gid = Ctx#fuse_ctx.gid,
-%                  st_atime = Now,
-%                  st_mtime = Now,
-    %%               st_ctime = Now },
-    %% Param = #fuse_entry_param{ 
-    %%               ino = Stat#stat.st_ino,
-    %%               generation = 1,
-    %%               attr = Stat#stat{ st_nlink = 1 },
-    %%               attr_timeout_ms = 
-    %%               100,
-    %%               entry_timeout_ms = 
-    %%               100
-    %%              },
-    %% fuserlsrv:reply(Cont, #fuse_reply_create{ fuse_entry_param = Param, 
-    %%                                           fuse_file_info = Fi }).
 
 release(Ctx, Ino, Fi, Cont, State) ->
     spawn_link 

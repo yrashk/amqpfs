@@ -18,7 +18,7 @@
 ** TODO fsync/fsyncdir
 ** TODO getxattr
 ** TODO listxattr
-** TODO mknod
+** DONE mknod
 ** DONE create
 ** TODO releasedir
 * DONE For a short period of time after startup, some of root directories do not belong to uid/gid, but to root/root (means 0)
