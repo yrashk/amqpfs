@@ -1,6 +1,6 @@
 * TODO Implement missing calls
 ** TODO link
-** TODO mkdir
+** DONE mkdir
 ** TODO removexattr
 ** TODO rename
 ** TODO rmdir

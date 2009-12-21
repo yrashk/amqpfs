@@ -27,7 +27,7 @@
 
   %%          getlk/6,
 %%            link/6,
-%%            mkdir/6,
+           mkdir/6,
 %%            removexattr/5,
 %%            rename/7,
 %%            rmdir/5,
@@ -428,16 +428,33 @@ mknod(Ctx, ParentIno, Name, Mode, Dev, Cont, State) ->
     spawn_link 
       (fun () -> 
                mknod_async(Ctx, ParentIno, Name, Mode, Dev, Cont, State) 
-       end).
+       end),
+    {noreply, State}.
+    
 
 mknod_async(Ctx, ParentIno, Name, Mode, _Dev, Cont, State) ->
     Result = 
     case ets:lookup(State#amqpfs.inodes, ParentIno) of
         [{ParentIno,Path}] ->
-            case remote(Path, {create, Path, Name}, Ctx, State) of
+            case remote(Path, {create, Path, Name, Mode}, Ctx, State) of
                 ok ->
-                    remote_setattr(Path, remote_getattr(Path, Ctx, State), #stat{ st_mode = Mode }, ?FUSE_SET_ATTR_MODE, Ctx, State),
-                    ok;
+                    Extra =
+                    case Mode band ?S_IFMT of
+                        ?S_IFREG ->
+                            {file, on_demand};
+                        ?S_IFDIR ->
+                            {directory, on_demand};
+                        ?S_IFLNK ->
+                            {link, on_demand} % links are not yet supported, though
+                    end,
+                    Param = #fuse_entry_param {
+                      ino = make_inode(Path ++ "/" ++ Name, Extra, State),
+                      generation = 1,
+                      attr = remote_getattr(Path, Ctx, State),
+                      attr_timeout_ms = 100,
+                      entry_timeout_ms = 100
+                     },
+                    #fuse_reply_entry { fuse_entry_param = Param };
                 Err ->
                     #fuse_reply_err { err = Err }
             end;
@@ -458,9 +475,18 @@ create_async(Ctx, ParentIno, Name, Mode, Fi, Cont, State) ->
     Result = 
     case ets:lookup(State#amqpfs.inodes, ParentIno) of
         [{ParentIno,Path}] ->
-            case remote(Path, {create, Path, Name}, Ctx, State) of
+            case remote(Path, {create, Path, Name, Mode}, Ctx, State) of
                 ok ->
-                    remote_setattr(Path, remote_getattr(Path, Ctx, State), #stat{ st_mode = Mode }, ?FUSE_SET_ATTR_MODE, Ctx, State),
+                    Extra = 
+                    case Mode band ?S_IFMT of
+                        ?S_IFREG ->
+                            {file, on_demand};
+                        ?S_IFDIR ->
+                            {directory, on_demand};
+                        ?S_IFLNK ->
+                            {link, on_demand} % links are not yet supported, though
+                    end,
+                    make_inode(Path ++ "/" ++ Name, Extra, State),
                     Response = remote(Path, {open, Path, Fi}, Ctx, State),
                     case Response of
                         ok -> #fuse_reply_open{fuse_file_info = Fi};
@@ -507,9 +533,8 @@ releasedir(_Ctx, _Ino, _Fi, _Cont, State) ->
 %%     io:format("ni: link~n"),
 %%     erlang:throw(not_implemented).
 
-%% mkdir(_Ctx, _ParentInode, _Name, _Mode, _Cont, _State) ->
-%%     io:format("ni: mkdir~n"),
-%%     erlang:throw(not_implemented).
+mkdir(Ctx, ParentIno, Name, Mode, Cont, State) ->
+    mknod(Ctx, ParentIno, Name, Mode bor ?S_IFDIR, {0,0}, Cont, State).
 
 
 %% removexattr(_Ctx, _Inode, _Name, _Cont, _State) ->

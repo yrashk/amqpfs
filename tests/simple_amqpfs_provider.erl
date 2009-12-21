@@ -1,6 +1,6 @@
 -module(simple_amqpfs_provider). 
 
--export([init/1, list_dir/2, create/3, open/3, resize/3, append/3, write/4, object/2, atime/2, mtime/2, ttl/2]).
+-export([init/1, list_dir/2, create/4, create_dir/4, open/3, resize/3, append/3, write/4, object/2, atime/2, mtime/2, ttl/2]).
 
 -include_lib("amqpfs/include/amqpfs.hrl").
 
@@ -10,9 +10,14 @@ init(State) ->
     State.
 
 
-create(Path, Name, _State) ->
+create(Path, Name, _Mode, _State) ->
     io:format("Trying to create ~s/~s~n",[Path,Name]),
     enotsup.
+
+create_dir(Path, Name, _Mode, _State) ->
+    io:format("Trying to create directory ~s/~s~n",[Path,Name]),
+    enotsup.
+
 
 list_dir("/simple", _State) ->
     [{"file1", {file, on_demand}}, {"file2", {file, on_demand}}];
