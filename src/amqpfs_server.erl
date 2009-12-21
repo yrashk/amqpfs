@@ -467,27 +467,46 @@ create(Ctx, ParentIno, Name, Mode, Fi, Cont, State) ->
        end),
     { noreply, State }.
 
-create_async(Ctx, _ParentIno, _Name, Mode, Fi, Cont, _State) ->
-    { Mega, Sec, _ } = erlang:now(),
-    Now = 1000000 * Mega + Sec,
-    Stat = #stat{ st_ino = amqpfs_inode:alloc(),
-                  st_mode = Mode,
-                  st_uid = Ctx#fuse_ctx.uid,
-                  st_gid = Ctx#fuse_ctx.gid,
-                  st_atime = Now,
-                  st_mtime = Now,
-                  st_ctime = Now },
-    Param = #fuse_entry_param{ 
-                  ino = Stat#stat.st_ino,
-                  generation = 1,
-                  attr = Stat#stat{ st_nlink = 1 },
-                  attr_timeout_ms = 
-                  100,
-                  entry_timeout_ms = 
-                  100
-                 },
-    fuserlsrv:reply(Cont, #fuse_reply_create{ fuse_entry_param = Param, 
-                                              fuse_file_info = Fi }).
+create_async(Ctx, ParentIno, Name, Mode, Fi, Cont, State) ->
+    Result = 
+    case ets:lookup(State#amqpfs.inodes, ParentIno) of
+        [{ParentIno,Path}] ->
+            case remote(Path, {create, Path, Name}, Ctx, State) of
+                ok ->
+                    remote_setattr(Path, remote_getattr(Path, Ctx, State), #stat{ st_mode = Mode }, ?FUSE_SET_ATTR_MODE, Ctx, State),
+                    Response = remote(Path, {open, Path, Fi}, Ctx, State),
+                    case Response of
+                        ok -> #fuse_reply_open{fuse_file_info = Fi};
+                        Err -> #fuse_reply_err { err = Err }
+                    end;
+                Err ->
+                    #fuse_reply_err { err = Err }
+            end;
+        _ ->
+            #fuse_reply_err{ err = enoent }
+    end,
+    fuserlsrv:reply(Cont, Result).   
+
+%    { Mega, Sec, _ } = erlang:now(),
+%    Now = 1000000 * Mega + Sec,
+%    Stat = #stat{ st_ino = amqpfs_inode:alloc(),
+%                  st_mode = Mode,
+%                  st_uid = Ctx#fuse_ctx.uid,
+%                  st_gid = Ctx#fuse_ctx.gid,
+%                  st_atime = Now,
+%                  st_mtime = Now,
+    %%               st_ctime = Now },
+    %% Param = #fuse_entry_param{ 
+    %%               ino = Stat#stat.st_ino,
+    %%               generation = 1,
+    %%               attr = Stat#stat{ st_nlink = 1 },
+    %%               attr_timeout_ms = 
+    %%               100,
+    %%               entry_timeout_ms = 
+    %%               100
+    %%              },
+    %% fuserlsrv:reply(Cont, #fuse_reply_create{ fuse_entry_param = Param, 
+    %%                                           fuse_file_info = Fi }).
 
 release(Ctx, Ino, Fi, Cont, State) ->
     spawn_link 

@@ -19,7 +19,7 @@
 ** TODO getxattr
 ** TODO listxattr
 ** TODO mknod
-** TODO create
+** DONE create
 ** TODO releasedir
 * DONE For a short period of time after startup, some of root directories do not belong to uid/gid, but to root/root (means 0)
 * DONE Consider counting st_nlinks for directories properly

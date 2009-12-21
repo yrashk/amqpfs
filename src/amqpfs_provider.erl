@@ -52,6 +52,8 @@ handle_info_async({#'basic.deliver'{consumer_tag=_ConsumerTag, delivery_tag=_Del
             case Command of
                 {list_dir, Path} ->
                     send_response(MessageId, ?CONTENT_TYPE_BERT, [ttl(Path, ReqState)], term_to_binary(call_module(list_dir,[Path, ReqState], ReqState)), ReqState);
+                {create, Path, Name} ->
+                    send_response(MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(create, [Path, Name, ReqState], ReqState)), ReqState);
                 {open, Path, Fi} ->
                     send_response(MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(open, [Path, Fi, ReqState], ReqState)), ReqState);
                 {read, Path, Size, Offset} ->
