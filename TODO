@@ -26,9 +26,6 @@
 * DONE . and .. should get proper uid/gid (now they are just 0/0), as well as permissions, actually
 * DONE Add readable(Path, owner|group|other, State), writable(Path, ..., ...) and executable(Path, ..., ...) callbacks
 * TODO Do something about namings in mq provider as some names can contain characters like "/". Or just pay less attention to mq_amqpfs_provider and move it to tests/ or samples/ :)
-* TODO When mounted using some user account, but then mount point is listed under root, it is a complete mess:
-** d?????????  ? ?      ?           ?                ? amqpfs    <--- instead of --->
-** drwxrwxrwx  1 root   root  0 1969-12-31 16:00 amqpfs
 * TODO Consider passing Fi for write and read
 * DONE Now sure what to do with timezones, currently 0 will not correspond to 1970/1/1 00:00 (unless you're in London or anywhere else with GMT+0). Observed this in PST
 ** In fact, that was alright, UTC 1970/1/1 happens 1969/12/31 4PM PST.
