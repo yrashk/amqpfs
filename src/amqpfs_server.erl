@@ -4,6 +4,7 @@
 -export ([ code_change/3,
            handle_info/2,
            init/1,
+           set_response_policies/3,
            terminate/2,
            getattr/4,
            lookup/5,
@@ -41,12 +42,6 @@
           ]).
 
 -include_lib("amqpfs/include/amqpfs.hrl").
-
--record (amqpfs, { inodes, 
-                   names,
-                   response_routes,
-                   response_cache,
-                   amqp_conn, amqp_channel, amqp_consumer_tag, amqp_response_consumer_tag }).
 
 -define(ON_DEMAND_TIMEOUT, 60000).
 
@@ -114,8 +109,11 @@ init ([]) ->
 
     State = #amqpfs{ inodes = ets:new(inodes, [public, ordered_set]),
                      names = ets:new(names, [public, set]),
+                     announcements = ets:new(announcements, [public, duplicate_bag]),
                      response_routes = ets:new(response_routes, [public, set]),
                      response_cache = ets:new(response_cache, [public, set]),
+                     response_policies = ets:new(response_policies, [public, set]),
+                     response_buffers = ets:new(response_buffers, [public, bag]),
                      amqp_conn = AmqpConn,
                      amqp_channel = AmqpChannel,
                      amqp_consumer_tag = ConsumerTag,
@@ -127,7 +125,7 @@ code_change (_OldVsn, State, _Extra) -> { ok, State }.
 
 handle_info({#'basic.deliver'{consumer_tag=ConsumerTag, delivery_tag=_DeliveryTag, redelivered=_Redelivered, 
                               exchange = <<"amqpfs.response">>, routing_key=_RoutingKey}, Content}, 
-            #amqpfs{response_routes = Tab, amqp_response_consumer_tag = ConsumerTag}=State) ->
+            #amqpfs{response_routes = Tab, amqp_response_consumer_tag = ConsumerTag, response_buffers = ResponseBuffers }=State) ->
     #amqp_msg{payload = Payload } = Content,
     #'P_basic'{content_type = ContentType, headers = Headers, reply_to = Route} = Content#amqp_msg.props,
     TTL = 
@@ -138,9 +136,19 @@ handle_info({#'basic.deliver'{consumer_tag=ConsumerTag, delivery_tag=_DeliveryTa
                 0
         end,
     Response = amqpfs_util:decode_payload(ContentType, Payload),
+    ets:insert(ResponseBuffers, {Route, Response, TTL}),
     case ets:lookup(Tab, Route) of 
-        [{Route, Pid}] ->
-            Pid ! {response, Response, TTL};
+        [{Route, Pid, Path, Command}] ->
+            {{PolicyM, PolicyF}, {AggregatorM, AggregatorF}} = get_response_policy(Path, Command, State),
+            case apply(PolicyM, PolicyF, [Response, State]) of
+                last_response ->
+                    Responses = ets:lookup(ResponseBuffers, Route),
+                    ets:delete(ResponseBuffers, Route),
+                    {ResponseToSend, TTLToSend} = apply(AggregatorM, AggregatorF, [lists:map(fun ({_, ResponseA, TTLA}) -> {ResponseA, TTLA} end, Responses)]),
+                    Pid ! {response, ResponseToSend, TTLToSend};
+                _ ->
+                    continue
+            end;
         _ ->
             discard
     end,
@@ -157,12 +165,29 @@ handle_info({#'basic.deliver'{consumer_tag=ConsumerTag, delivery_tag=_DeliveryTa
 handle_info (_Msg, State) -> { noreply, State }.
 terminate (_Reason, _State) -> ok.
 
-handle_command({announce, directory, {Path, Contents}}, State) ->
+handle_command({announce, directory, {Path, Contents}}, #amqpfs{ announcements = Announcements} = State) ->
     {_, State1} = make_inode(Path, {directory, Contents}, State),
+    ets:insert(Announcements, {Path, {directory, Contents}}),
+    set_response_policies(Path, ?DEFAULT_RESPONSE_POLICIES, State),
     State1;
 
 handle_command({cancel, directory, _Path}, State) ->
     State.
+
+set_response_policies(Path, Policies, #amqpfs{ response_policies = ResponsePolicies } = _State) ->
+    ets:insert(ResponsePolicies, {Path, Policies}).
+
+get_response_policy(Path, Command, #amqpfs{ response_policies = ResponsePolicies } = State) ->
+    case ets:lookup(ResponsePolicies, Path) of
+        [] ->
+            get_response_policy(filename:dirname(Path), Command, State);
+        [{Path, Policies}] ->
+            CommandName = element(1,Command),
+            {value, {CommandName, Policy, Aggregator}} = lists:keysearch(CommandName, 1, Policies),
+            {Policy, Aggregator};
+        _ ->
+            never_happens
+    end.
 
 getattr(Ctx, Ino, Cont, State) ->
     spawn_link(fun () -> getattr_async(Ctx,
@@ -601,7 +626,7 @@ take_while (F, Acc, [ H | T ]) ->
        []
    end.
 
-make_inode (Name,Extra, State) ->
+make_inode(Name,Extra, State) ->
   case ets:lookup (State#amqpfs.names, Name) of
       [{Name, { Ino, _ } }] ->
           { Ino, State };
@@ -613,11 +638,9 @@ make_inode (Name,Extra, State) ->
           { Id, State }
   end.
 
-
-
-register_response_route(#amqpfs{response_routes=Tab}) ->
+register_response_route(Path, Command, #amqpfs{response_routes=Tab}) ->
     Route = list_to_binary(lists:flatten(io_lib:format("~w",[now()]))),
-    ets:insert(Tab, {Route, self()}),
+    ets:insert(Tab, {Route, self(), Path, Command}),
     Route.
 
 unregister_response_route(Route, #amqpfs{response_routes=Tab}) ->
@@ -660,7 +683,7 @@ remote(Path, Command, Ctx, #amqpfs{response_cache = Tab}=State) ->
     end.
 
 remote_impl(Path, Command, Ctx, #amqpfs{amqp_channel = Channel, response_cache = Tab}=State) ->
-    Route = register_response_route(State),
+    Route = register_response_route(Path, Command, State),
     amqp_channel:call(Channel, #'basic.publish'{exchange = <<"amqpfs">>, routing_key = amqpfs_util:path_to_routing_key(Path)}, 
                       {amqp_msg, #'P_basic'{message_id = Route, headers = env_headers(State) ++ ctx_headers(Ctx) }, term_to_binary(Command)}),
     Response = 

@@ -16,3 +16,27 @@
           request_command,
           extra
          }).
+
+-record (amqpfs, { inodes, 
+                   names,
+                   announcements,
+                   response_routes,
+                   response_cache,
+                   response_policies,
+                   response_buffers,
+                   amqp_conn, amqp_channel, amqp_consumer_tag, amqp_response_consumer_tag }).
+
+-define(DEFAULT_RESPONSE_POLICY, {amqpfs_response_policy, first}).
+-define(DEFAULT_RESPONSE_AGGREGATION, {amqpfs_response_aggregation, first}).
+
+-define(DEFAULT_RESPONSE_POLICIES,
+        [{list_dir, ?DEFAULT_RESPONSE_POLICY, ?DEFAULT_RESPONSE_AGGREGATION},
+         {create, ?DEFAULT_RESPONSE_POLICY, ?DEFAULT_RESPONSE_AGGREGATION},
+         {open, ?DEFAULT_RESPONSE_POLICY, ?DEFAULT_RESPONSE_AGGREGATION}, 
+         {read, ?DEFAULT_RESPONSE_POLICY, ?DEFAULT_RESPONSE_AGGREGATION},
+         {write, ?DEFAULT_RESPONSE_POLICY, ?DEFAULT_RESPONSE_AGGREGATION},
+         {getattr, ?DEFAULT_RESPONSE_POLICY, ?DEFAULT_RESPONSE_AGGREGATION},
+         {setattr, ?DEFAULT_RESPONSE_POLICY, ?DEFAULT_RESPONSE_AGGREGATION},
+         {release, ?DEFAULT_RESPONSE_POLICY, ?DEFAULT_RESPONSE_AGGREGATION}
+        ]).
+          
