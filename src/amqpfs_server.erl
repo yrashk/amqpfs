@@ -191,7 +191,8 @@ set_response_policies(Path, Policies, #amqpfs{ response_policies = ResponsePolic
     ets:insert(ResponsePolicies, {Path, Policies}).
 
 set_response_policies(Path, Policies) ->
-    amqpfs ! {set_response_policies, Path, Policies}.
+    amqpfs ! {set_response_policies, Path, Policies},
+    ok.
 
 get_response_policy(Path, Command, #amqpfs{ response_policies = ResponsePolicies } = State) ->
     case ets:lookup(ResponsePolicies, Path) of
