@@ -21,6 +21,7 @@
 ** DONE mknod
 ** DONE create
 ** TODO releasedir
+* TODO Improve announcement number calculation in amqpfs_response_policy, as current one will not properly account that, for example, if we have two providers, providing /p1 and /p1/p2 respectively (rare but technically possibly) it will not know about /p1 (will stop on /p1/p2)
 * DONE For a short period of time after startup, some of root directories do not belong to uid/gid, but to root/root (means 0)
 * DONE Consider counting st_nlinks for directories properly
 * DONE . and .. should get proper uid/gid (now they are just 0/0), as well as permissions, actually
