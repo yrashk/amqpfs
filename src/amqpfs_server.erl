@@ -140,13 +140,13 @@ handle_info({#'basic.deliver'{consumer_tag=ConsumerTag, delivery_tag=_DeliveryTa
     ets:insert(ResponseBuffers, {Route, Response, TTL}),
     case ets:lookup(Tab, Route) of 
         [{Route, Pid, Path, Command}] ->
-            {PolicyF, AggregatorF} = get_response_policy(Path, Command, State),
+            {PolicyF, ReduceF} = get_response_policy(Path, Command, State),
             case apply(amqpfs_response_policy, PolicyF, [Route, Response, State]) of
                 last_response ->
                     Responses = ets:lookup(ResponseBuffers, Route),
                     ets:delete(ResponseBuffers, Route),
                     unregister_response_route(Route, State), % it is pretty safe to assume that there are no more messages to deliver
-                    {ResponseToSend, TTLToSend} = apply(amqpfs_response_aggregation, AggregatorF, [lists:map(fun ({_, ResponseA, TTLA}) -> {ResponseA, TTLA} end, Responses)]),
+                    {ResponseToSend, TTLToSend} = apply(amqpfs_response_reduce, ReduceF, [lists:map(fun ({_, ResponseA, TTLA}) -> {ResponseA, TTLA} end, Responses)]),
                     Pid ! {response, ResponseToSend, TTLToSend};
                 _ ->
                     continue
@@ -200,8 +200,8 @@ get_response_policy(Path, Command, #amqpfs{ response_policies = ResponsePolicies
             get_response_policy(filename:dirname(Path), Command, State);
         [{Path, Policies}] ->
             CommandName = element(1,Command),
-            {value, {CommandName, Policy, Aggregator}} = lists:keysearch(CommandName, 1, Policies),
-            {Policy, Aggregator};
+            {value, {CommandName, Policy, Reducer}} = lists:keysearch(CommandName, 1, Policies),
+            {Policy, Reducer};
         _ ->
             never_happens
     end.

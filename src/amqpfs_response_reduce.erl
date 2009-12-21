@@ -1,4 +1,4 @@
--module(amqpfs_response_aggregation).
+-module(amqpfs_response_reduce).
 -export([first/1, concat/1]).
 
 -include_lib("amqpfs/include/amqpfs.hrl").
