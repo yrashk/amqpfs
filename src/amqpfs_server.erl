@@ -140,13 +140,13 @@ handle_info({#'basic.deliver'{consumer_tag=ConsumerTag, delivery_tag=_DeliveryTa
     ets:insert(ResponseBuffers, {Route, Response, TTL}),
     case ets:lookup(Tab, Route) of 
         [{Route, Pid, Path, Command}] ->
-            {PolicyF, ReduceF} = get_response_policy(Path, Command, State),
-            case apply(amqpfs_response_policy, PolicyF, [Route, Response, State]) of
+            {{PolicyM, PolicyF, PolicyA}, {ReduceM, ReduceF, ReduceA}} = get_response_policy(Path, Command, State),
+            case apply(PolicyM, PolicyF, PolicyA ++ [Route, Response, State]) of
                 last_response ->
                     Responses = ets:lookup(ResponseBuffers, Route),
                     ets:delete(ResponseBuffers, Route),
                     unregister_response_route(Route, State), % it is pretty safe to assume that there are no more messages to deliver
-                    {ResponseToSend, TTLToSend} = apply(amqpfs_response_reduce, ReduceF, [lists:map(fun ({_, ResponseA, TTLA}) -> {ResponseA, TTLA} end, Responses)]),
+                    {ResponseToSend, TTLToSend} = apply(ReduceM, ReduceF, ReduceA ++ [lists:map(fun ({_, ResponseA, TTLA}) -> {ResponseA, TTLA} end, Responses)]),
                     Pid ! {response, ResponseToSend, TTLToSend};
                 _ ->
                     continue
@@ -201,10 +201,29 @@ get_response_policy(Path, Command, #amqpfs{ response_policies = ResponsePolicies
         [{Path, Policies}] ->
             CommandName = element(1,Command),
             {value, {CommandName, Policy, Reducer}} = lists:keysearch(CommandName, 1, Policies),
-            {Policy, Reducer};
+            {normalize_policy_function(Policy), normalize_reduce_function(Reducer)};
         _ ->
             never_happens
     end.
+
+normalize_policy_function(Fun) when is_atom(Fun) ->
+    {amqpfs_response_policy, Fun, []};
+normalize_policy_function({Fun, Args}) when is_atom(Fun) andalso is_list(Args) ->
+    {amqpfs_response_policy, Fun, Args};
+normalize_policy_function({Module, Fun}) when is_atom(Module) andalso is_atom(Fun) ->
+    {Module, Fun, []};
+normalize_policy_function({Module, Fun, Args}) when is_atom(Module) andalso is_atom(Fun) andalso is_list(Args) ->
+    {Module, Fun, Args}.
+
+normalize_reduce_function(Fun) when is_atom(Fun) ->
+    {amqpfs_response_reduce, Fun, []};
+normalize_reduce_function({Fun, Args}) when is_atom(Fun) andalso is_list(Args) ->
+    {amqpfs_reduece_policy, Fun, Args};
+normalize_reduce_function({Module, Fun}) when is_atom(Module) andalso is_atom(Fun) ->
+    {Module, Fun, []};
+normalize_reduce_function({Module, Fun, Args}) when is_atom(Module) andalso is_atom(Fun) andalso is_list(Args) ->
+    {Module, Fun, Args}.
+
 
 getattr(Ctx, Ino, Cont, State) ->
     spawn_link(fun () -> getattr_async(Ctx,
