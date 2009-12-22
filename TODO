@@ -2,7 +2,7 @@
 ** TODO link
 ** DONE mkdir
 ** TODO removexattr
-** TODO rename
+** DONE rename
 ** DONE rmdir
 ** TODO setxattr
 ** TODO statfs
