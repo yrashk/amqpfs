@@ -33,7 +33,7 @@ init(#amqpfs_provider_state{ channel = Channel }=State) ->
     receive
         #'basic.consume_ok'{consumer_tag = ConsumerTag} -> ok
     end,
-    State1 = State#amqpfs_provider_state { extra = #root_amqpfs_provider_extra{ items = ets:new(items, [public, set]) } },
+    State1 = State#amqpfs_provider_state { extra = #root_amqpfs_provider_extra{ items = ets:new(root_fs_items, [public, set]) } },
     amqpfs_provider:announce(directory, "/", State1),
     State1.
 
