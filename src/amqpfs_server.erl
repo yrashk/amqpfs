@@ -32,13 +32,13 @@
            mkdir/6,
 %%            removexattr/5,
 %%            rename/7,
-%%            rmdir/5,
-           setattr/7
+           rmdir/5,
+           setattr/7,
 %%            setlk/7,
 %%            setxattr/7,
 %%            statfs/4,
 %%            symlink/6,
-%%            unlink/5
+           unlink/5
 
           ]).
 
@@ -606,9 +606,21 @@ mkdir(Ctx, ParentIno, Name, Mode, Cont, State) ->
 %%     io:format("ni: rename~n"),
 %%     erlang:throw(not_implemented).
 
-%% rmdir(_Ctx, _Inode, _Name, _Cont, _State) ->
-%%     io:format("ni: rmdir~n"),
-%%     erlang:throw(not_implemented).
+rmdir(Ctx, ParentIno, Name, Cont, State) ->
+    spawn_link(fun () -> rmdir_async(Ctx, ParentIno, Name, Cont, State) end),
+    { noreply, State }.
+
+rmdir_async(Ctx, ParentIno, Name, Cont, State) ->
+    Result =
+    case ets:lookup(State#amqpfs.inodes, ParentIno) of
+        [{ParentIno,Path}] ->
+            FullPath = amqpfs_util:concat_path([Path,binary_to_list(Name)]),
+            remote(Path, {rmdir, FullPath}, Ctx, State);
+        _ ->
+            enoent
+    end,
+    fuserlsrv:reply (Cont, #fuse_reply_err{ err = Result }).
+            
 
 setattr(Ctx, Ino, Attr, ToSet, Fi, Cont, State) ->
     spawn_link(fun () -> setattr_async(Ctx, Ino, Attr, ToSet, Fi, Cont, State) end),
@@ -647,9 +659,21 @@ setattr_async(Ctx, Ino, Attr, ToSet, _Fi, Cont, State) ->
 %%     io:format("ni: symlink~n"),
 %%     erlang:throw(not_implemented).
 
-%% unlink(_Ctx, _Inode, _Name, _Cont, _State) ->
-%%     io:format("ni: unlink~n"),
-%%     erlang:throw(not_implemented).
+unlink(Ctx, ParentIno, Name, Cont, State) ->
+    spawn_link(fun () -> unlink_async(Ctx, ParentIno, Name, Cont, State) end),
+    { noreply, State }.
+
+unlink_async(Ctx, ParentIno, Name, Cont, State) ->
+    Result =
+    case ets:lookup(State#amqpfs.inodes, ParentIno) of
+        [{ParentIno,Path}] ->
+            FullPath = Path ++ "/" ++ Name,
+            remote(Path, {remove, FullPath}, Ctx, State);
+        _ ->
+            enoent
+    end,
+    fuserlsrv:reply (Cont, #fuse_reply_err{ err = Result }).
+            
 %%%%%%%%%%%
 
 take_while (_, _, []) -> 
