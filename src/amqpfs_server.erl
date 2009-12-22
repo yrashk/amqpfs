@@ -37,7 +37,7 @@
            setattr/7,
 %%            setxattr/7,
 %%            statfs/4,
-%%            symlink/6,
+           symlink/6,
            unlink/5
 
           ]).
@@ -406,8 +406,32 @@ readdir_async(Ctx, Ino, Size, Offset, _Fi, Cont, #amqpfs{}=State) ->
              ] ++ Contents)),
     fuserlsrv:reply (Cont, #fuse_reply_direntrylist{ direntrylist = DirEntryList }).
 
-readlink (_, _, _, State) ->
-    { #fuse_reply_err{ err = einval }, State }.
+readlink(Ctx, Ino, Cont, State) ->
+    spawn_link(fun () -> readlink_async(Ctx, Ino, Cont, State) end),
+    {noreply, State}.
+
+readlink_async(Ctx, Ino, Cont, State) ->
+    Result =
+    case ets:lookup(State#amqpfs.inodes, Ino) of
+        [{Ino,Path}] ->
+            case ets:lookup(State#amqpfs.names, Path) of
+                [{Path, {Ino, {symlink, on_demand}}}] ->
+                    case remote(Path, {readlink, Path}, Ctx, State) of
+                        Data when is_list(Data) ->
+                            #fuse_reply_readlink{ link = Data };
+                        Err when is_atom(Err) ->
+                            #fuse_reply_err { err = enoent }
+                    end;
+                [{Path, {Ino, {symlink, Contents}}}] when is_list(Contents) ->
+                    #fuse_reply_readlink{ link = Contents };
+                _ ->
+                    #fuse_reply_err { err = enoent }
+            end;
+        _ ->
+            #fuse_reply_err{ err = enoent }
+    end,
+    fuserlsrv:reply(Cont, Result).
+
 
 write(Ctx, Ino, Data, Offset, Fi, Cont, State) ->
     spawn_link(fun () -> write_async(Ctx,
@@ -513,6 +537,34 @@ link_async(Ctx, Ino, NewParentIno, NewName, Cont, State) ->
     end,
     fuserlsrv:reply (Cont, Result).
                               
+symlink(Ctx, Link, Ino, Name, Cont, State) ->
+    spawn_link(fun() -> symlink_async(Ctx, Link, Ino, Name, Cont, State) end).
+
+symlink_async(Ctx, Link, Ino, Name, Cont, State) ->
+   Result =
+    case ets:lookup(State#amqpfs.inodes, Ino) of
+        [{Ino,Path}] ->
+            LinkStr = binary_to_list(Link),
+            FullPath = amqpfs_util:concat_path([Path,binary_to_list(Name)]),
+            case remote(Path, {symlink, FullPath, LinkStr}, Ctx, State) of
+                ok ->
+                    {NewIno, _ } = make_inode(FullPath, {symlink, LinkStr}, State),
+                    Stat = remote_getattr(FullPath, Ctx, State),
+                    #fuse_reply_entry{ 
+                                       fuse_entry_param = #fuse_entry_param{ ino = NewIno,
+                                                                             generation = 1,  
+                                                                             attr_timeout_ms = 1000,
+                                                                             entry_timeout_ms = 1000,
+                                                                             attr = Stat } };
+                Err ->
+                    #fuse_reply_err{ err = Err }
+            end;
+        _ ->
+            #fuse_reply_err{ err = enoent }
+    end,
+   fuserlsrv:reply (Cont, Result).
+
+                        
                         
 
 mknod(Ctx, ParentIno, Name, Mode, Dev, Cont, State) ->
@@ -537,7 +589,7 @@ mknod_async(Ctx, ParentIno, Name, Mode, _Dev, Cont, State) ->
                         ?S_IFDIR ->
                             {directory, on_demand};
                         ?S_IFLNK ->
-                            {link, on_demand} % links are not yet supported, though
+                            {symlink, on_demand}
                     end,
                     Param = #fuse_entry_param {
                       ino = make_inode(amqpfs_util:concat_path([Path,Name]), Extra, State),
@@ -576,7 +628,7 @@ create_async(Ctx, ParentIno, Name, Mode, Fi, Cont, State) ->
                         ?S_IFDIR ->
                             {directory, on_demand};
                         ?S_IFLNK ->
-                            {link, on_demand} % links are not yet supported, though
+                            {symlink, on_demand}
                     end,
                     make_inode(amqpfs_util:concat_path([Path,Name]), Extra, State),
                     Response = remote(Path, {open, Path, Fi}, Ctx, State),
@@ -731,10 +783,6 @@ setlk_async(Ctx, Ino, Fi, Lock, Sleep, Cont, State) ->
 %%     {noreply, State}.
 
 
-%% symlink(_Ctx, _Link, _Inode, _Name, _Cont, _State) ->
-%%     io:format("ni: symlink~n"),
-%%     erlang:throw(not_implemented).
-
 unlink(Ctx, ParentIno, Name, Cont, State) ->
     spawn_link(fun () -> unlink_async(Ctx, ParentIno, Name, Cont, State) end),
     { noreply, State }.
@@ -807,6 +855,8 @@ remote_getattr(Path, Ctx, State) ->
             Stat0#stat{ st_mode = ?S_IFDIR bor Stat0#stat.st_mode bor ?S_IXUSR bor ?S_IXGRP bor ?S_IXOTH, st_ino = Ino, st_nlink = NLink};
         [{Path, {Ino, {file, on_demand}}}] ->
             Stat0#stat{ st_mode = ?S_IFREG bor Stat0#stat.st_mode, st_ino = Ino, st_nlink = 1 };
+        [{Path, {Ino, {symlink, _Contents}}}] ->
+            Stat0#stat{ st_mode = ?S_IFLNK bor Stat0#stat.st_mode, st_ino = Ino, st_nlink = 1 };
         [] ->
             Stat0
     end.

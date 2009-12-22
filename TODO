@@ -6,12 +6,12 @@
 ** DONE rmdir
 ** TODO setxattr
 ** TODO statfs
-** TODO symlink
+** DONE symlink
 ** DONE unlink
 ** DONE setlk
 ** DONE getlk
 * TODO Finish incomplete implementations of these calls:
-** TODO readlink
+** DONE readlink
 ** TODO access
 ** TODO flush
 ** TODO forget

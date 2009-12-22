@@ -1,6 +1,6 @@
 -module(simple_amqpfs_provider). 
 
--export([init/1, list_dir/2, create/4, create_dir/4, remove/2, rename/3, open/3, resize/3, append/3, write/4, object/2, atime/2, mtime/2, ttl/2]).
+-export([init/1, list_dir/2, create/4, create_dir/4, readlink/2, remove/2, rename/3, open/3, resize/3, append/3, write/4, object/2, atime/2, mtime/2, ttl/2]).
 
 -include_lib("amqpfs/include/amqpfs.hrl").
 
@@ -27,11 +27,14 @@ rename(Path, NewPath, _State) ->
     enotsup.
 
 list_dir("/simple", _State) ->
-    [{"file1", {file, on_demand}}, {"file2", {file, on_demand}}];
+    [{"file1", {file, on_demand}}, {"file2", {file, on_demand}},{"FILE", {symlink, "file1"}}];
 
 list_dir("/simple_on_demand", State) ->
     {value, {_, _, Node }} = lists:keysearch(<<"node">>,1,State#amqpfs_provider_state.request_headers),
-    [{"bogus",{file, on_demand}}, {binary_to_list(Node), {file, on_demand}}].
+    [{"bogus",{file, on_demand}}, {binary_to_list(Node), {file, on_demand}}, {"BOGUS", {symlink, on_demand}}].
+
+readlink("/simple_on_demand/BOGUS",_State) ->
+    "../simple/file1".
 
 open("/simple_on_demand/bogus", _Fi, _State) ->
     ok.

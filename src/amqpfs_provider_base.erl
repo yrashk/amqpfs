@@ -4,7 +4,7 @@
          list_dir/2, 
          create/4, create_dir/4,
          rmdir/2, remove/2,
-         rename/3, link/3,
+         rename/3, link/3, symlink/3, readlink/2,
          open/3, release/3,
          read/4, getattr/2, setattr/5,
          object/2, size/2, resize/3,
@@ -47,6 +47,12 @@ rename(_Path,_NewPath,_State) ->
 
 link(_Path, _NewPath, _State) ->
     enotsup.
+
+symlink(_Path, _Contents, _State) ->
+    ok.
+
+readlink(_Path, _State) ->
+    einval.
 
 open(_Path, _Fi, _State) ->
     ok.
