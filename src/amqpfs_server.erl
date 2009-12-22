@@ -32,7 +32,7 @@
 %%            link/6,
            mkdir/6,
 %%            removexattr/5,
-%%            rename/7,
+           rename/7,
            rmdir/5,
            setattr/7,
 %%            setxattr/7,
@@ -608,9 +608,29 @@ mkdir(Ctx, ParentIno, Name, Mode, Cont, State) ->
 %%     io:format("ni: removexattr~n"),
 %%     erlang:throw(not_implemented).
 
-%% rename(_Ctx, _Parent, _Name, _NewParent, _NewName, _Cont, _State) ->
-%%     io:format("ni: rename~n"),
-%%     erlang:throw(not_implemented).
+rename(Ctx, ParentIno, Name, NewParentIno, NewName, Cont, State) ->
+    spawn_link(fun () -> rename_async(Ctx, ParentIno, Name, NewParentIno, NewName, Cont, State) end),
+    {noreply, State}.
+
+rename_async(Ctx, ParentIno, Name, NewParentIno, NewName, Cont, State) ->
+    Result =
+    case ets:lookup(State#amqpfs.inodes, ParentIno) of
+        [{ParentIno,Path}] ->
+            case ets:lookup(State#amqpfs.inodes, NewParentIno) of
+                [{NewParentIno,NewPath}] ->
+                    FullPath = amqpfs_util:concat_path([Path,binary_to_list(Name)]),
+                    NewFullPath = amqpfs_util:concat_path([NewPath,binary_to_list(NewName)]),
+                    remote(Path, {rename, FullPath, NewFullPath}, Ctx, State);
+                _ ->
+                    enoent
+            end;
+        _ ->
+            enoent
+    end,
+    fuserlsrv:reply (Cont, #fuse_reply_err{ err = Result }).
+
+                        
+
 
 rmdir(Ctx, ParentIno, Name, Cont, State) ->
     spawn_link(fun () -> rmdir_async(Ctx, ParentIno, Name, Cont, State) end),

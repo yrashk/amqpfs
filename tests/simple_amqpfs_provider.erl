@@ -1,6 +1,6 @@
 -module(simple_amqpfs_provider). 
 
--export([init/1, list_dir/2, create/4, create_dir/4, remove/2, open/3, resize/3, append/3, write/4, object/2, atime/2, mtime/2, ttl/2]).
+-export([init/1, list_dir/2, create/4, create_dir/4, remove/2, rename/3, open/3, resize/3, append/3, write/4, object/2, atime/2, mtime/2, ttl/2]).
 
 -include_lib("amqpfs/include/amqpfs.hrl").
 
@@ -21,6 +21,10 @@ create_dir(Path, Name, _Mode, _State) ->
 remove("/simple/" ++ File, _State) ->
     io:format("Trying to remove /simple/~s~n",[File]),
     ok.
+
+rename(Path, NewPath, _State) ->
+    io:format("Trying to rename ~s to ~s~n",[Path, NewPath]),
+    enotsup.
 
 list_dir("/simple", _State) ->
     [{"file1", {file, on_demand}}, {"file2", {file, on_demand}}];

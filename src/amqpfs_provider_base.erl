@@ -4,6 +4,7 @@
          list_dir/2, 
          create/4, create_dir/4,
          rmdir/2, remove/2,
+         rename/3,
          open/3, release/3,
          read/4, getattr/2, setattr/5,
          object/2, size/2, resize/3,
@@ -39,6 +40,9 @@ rmdir(_,_) ->
     enotsup.
 
 remove(_,_) ->    
+    enotsup.
+
+rename(_,_,_State) ->
     enotsup.
 
 open(_, _Fi, _State) ->
