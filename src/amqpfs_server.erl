@@ -29,7 +29,7 @@
 
            getlk/6,
            setlk/7,
-%%            link/6,
+           link/6,
            mkdir/6,
 %%            removexattr/5,
            rename/7,
@@ -475,6 +475,45 @@ listxattr(Ctx, Ino, Size, Cont, State) ->
 listxattr_async(_Ctx, _Ino, _Size, Cont, _State) ->
     fuserlsrv:reply(Cont, #fuse_reply_err{ err = erange }).
 
+link(Ctx, Ino, NewParentIno, NewName, Cont, State) ->
+    spawn_link(fun () -> link_async(Ctx, Ino, NewParentIno, NewName, Cont, State) end),
+    {noreply, State}.
+
+link_async(Ctx, Ino, NewParentIno, NewName, Cont, State) ->
+   Result =
+    case ets:lookup(State#amqpfs.inodes, Ino) of
+        [{Ino,Path}] ->
+            case ets:lookup(State#amqpfs.inodes, NewParentIno) of
+                [{NewParentIno,NewPath}] ->
+                    NewFullPath = amqpfs_util:concat_path([NewPath,binary_to_list(NewName)]),
+                    Extra = case ets:lookup(State#amqpfs.names, Path) of
+                                [{Path, {_,Type}}] ->
+                                    Type;
+                                _ ->
+                                    {file, on_demand} % but this should never happen, I guess
+                            end,
+                    case remote(Path, {link, Path, NewFullPath}, Ctx, State) of
+                        ok ->
+                            {NewIno, _ } = make_inode(NewFullPath, Extra, State),
+                            Stat = remote_getattr(NewFullPath, Ctx, State),
+                            #fuse_reply_entry{ 
+                                               fuse_entry_param = #fuse_entry_param{ ino = NewIno,
+                                                                                     generation = 1,  
+                                                                                     attr_timeout_ms = 1000,
+                                                                                     entry_timeout_ms = 1000,
+                                                                                     attr = Stat } };
+                        Err ->
+                            #fuse_reply_err{ err = Err }
+                    end;
+                _ ->
+                    #fuse_reply_err{ err = enoent }
+            end;
+        _ ->
+            #fuse_reply_err{ err = enoent }
+    end,
+    fuserlsrv:reply (Cont, Result).
+                              
+                        
 
 mknod(Ctx, ParentIno, Name, Mode, Dev, Cont, State) ->
     spawn_link 
@@ -482,6 +521,7 @@ mknod(Ctx, ParentIno, Name, Mode, Dev, Cont, State) ->
                mknod_async(Ctx, ParentIno, Name, Mode, Dev, Cont, State) 
        end),
     {noreply, State}.
+
     
 
 mknod_async(Ctx, ParentIno, Name, Mode, _Dev, Cont, State) ->
@@ -595,10 +635,6 @@ getlk_async(Ctx, Ino, Fi, Lock, Cont, State) ->
                 #fuse_reply_err{ err = enoent }
         end,
     fuserlsrv:reply (Cont, Result).
-
-%% link(_Ctx, _Ino, _NewParent, _NewName, _Cont, _State) ->
-%%     io:format("ni: link~n"),
-%%     erlang:throw(not_implemented).
 
 mkdir(Ctx, ParentIno, Name, Mode, Cont, State) ->
     mknod(Ctx, ParentIno, Name, Mode bor ?S_IFDIR, {0,0}, Cont, State).

@@ -1,5 +1,5 @@
 * TODO Implement missing calls
-** TODO link
+** DONE link
 ** DONE mkdir
 ** TODO removexattr
 ** DONE rename
@@ -25,6 +25,7 @@
 * TODO Consider making a special case for {rmdir, "/announced_directory"} being somehow routed to the provider that announced "/announced_directory" as well
 * TODO Improve announcement number calculation in amqpfs_response_policy, as current one will not properly account that, for example, if we have two providers, providing /p1 and /p1/p2 respectively (rare but technically possibly) it will not know about /p1 (will stop on /p1/p2)
 * TODO Think about renaming scenario when src and dest are served by different providers. It is not supported as of now, but might be an interesting case.
+* TODO Think about linking scenario when src and dest are served by different providers. It is not supported as of now, but might be an interesting case.
 * DONE For a short period of time after startup, some of root directories do not belong to uid/gid, but to root/root (means 0)
 * DONE Consider counting st_nlinks for directories properly
 * DONE . and .. should get proper uid/gid (now they are just 0/0), as well as permissions, actually

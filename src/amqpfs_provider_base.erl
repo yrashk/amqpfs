@@ -4,7 +4,7 @@
          list_dir/2, 
          create/4, create_dir/4,
          rmdir/2, remove/2,
-         rename/3,
+         rename/3, link/3,
          open/3, release/3,
          read/4, getattr/2, setattr/5,
          object/2, size/2, resize/3,
@@ -43,6 +43,9 @@ remove(_Path,_State) ->
     enotsup.
 
 rename(_Path,_NewPath,_State) ->
+    enotsup.
+
+link(_Path, _NewPath, _State) ->
     enotsup.
 
 open(_Path, _Fi, _State) ->

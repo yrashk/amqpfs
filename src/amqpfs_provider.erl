@@ -62,6 +62,8 @@ handle_info_async({#'basic.deliver'{consumer_tag=_ConsumerTag, delivery_tag=_Del
                     send_response(MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(remove, [Path, ReqState], ReqState)), ReqState);
                 {rename, Path, NewPath} ->
                     send_response(MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(rename, [Path, NewPath, ReqState], ReqState)), ReqState);
+                {link, Path, NewPath} ->
+                    send_response(MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(link, [Path, NewPath, ReqState], ReqState)), ReqState);
                 {open, Path, Fi} ->
                     send_response(MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(open, [Path, Fi, ReqState], ReqState)), ReqState);
                 {read, Path, Size, Offset} ->
