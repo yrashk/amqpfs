@@ -1,4 +1,4 @@
--module(amqpfs_response_policy).
+-module(amqpfs_response_collect).
 -export([first/3, all/3, number/4, percentile/4]).
 
 -include_lib("amqpfs/include/amqpfs.hrl").
