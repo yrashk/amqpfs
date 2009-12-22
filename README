@@ -1,7 +1,7 @@
 Introduction
 ============
 
-AMQPFS is Filesystem as API that works through AMQPFS, all filesystem providers are available through AMQP bus and can be distributed
+AMQPFS is a Filesystem as API that works through AMQPFS, all filesystem providers are available through AMQP bus and can be distributed
 in the network.
 
 What's the point? Why one needs this? Well, this project started as a way to integrate some third-party software while maintaining no real files or directories for them. 
