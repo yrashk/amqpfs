@@ -137,16 +137,17 @@ handle_info({#'basic.deliver'{consumer_tag=ConsumerTag, delivery_tag=_DeliveryTa
                 0
         end,
     Response = amqpfs_util:decode_payload(ContentType, Payload),
-    ets:insert(ResponseBuffers, {Route, Response, TTL}),
+    Timestamp = amqpfs_util:datetime_to_unixtime(erlang:localtime()),
+    ets:insert(ResponseBuffers, {Route, Response, TTL, Timestamp}),
     case ets:lookup(Tab, Route) of 
         [{Route, Pid, Path, Command}] ->
             {{PolicyM, PolicyF, PolicyA}, {ReduceM, ReduceF, ReduceA}} = get_response_policy(Path, Command, State),
             case apply(PolicyM, PolicyF, PolicyA ++ [Route, Response, State]) of
                 last_response ->
-                    Responses = ets:lookup(ResponseBuffers, Route),
+                    Responses = lists:keysort(4, ets:lookup(ResponseBuffers, Route)),
                     ets:delete(ResponseBuffers, Route),
                     unregister_response_route(Route, State), % it is pretty safe to assume that there are no more messages to deliver
-                    {ResponseToSend, TTLToSend} = apply(ReduceM, ReduceF, ReduceA ++ [lists:map(fun ({_, ResponseA, TTLA}) -> {ResponseA, TTLA} end, Responses)]),
+                    {ResponseToSend, TTLToSend} = apply(ReduceM, ReduceF, ReduceA ++ [lists:map(fun ({_, ResponseA, TTLA, _}) -> {ResponseA, TTLA} end, Responses)]),
                     Pid ! {response, ResponseToSend, TTLToSend};
                 _ ->
                     continue
