@@ -3,6 +3,7 @@
 -export([amqp_credentials/0, init/1, 
          list_dir/2, 
          create/4, create_dir/4,
+         rmdir/2, remove/2,
          open/3, release/3,
          read/4, getattr/2, setattr/5,
          object/2, size/2, resize/3,
@@ -32,7 +33,13 @@ create(_,_,_,_) ->
 
 create_dir(_,_,_,_) ->
     enotsup.
-    
+
+rmdir(_,_) ->
+    enotsup.
+
+remove(_,_) ->    
+    enotsup.
+
 open(_, _Fi, _State) ->
     ok.
 

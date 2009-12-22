@@ -32,13 +32,13 @@
            mkdir/6,
 %%            removexattr/5,
 %%            rename/7,
-%%            rmdir/5,
-           setattr/7
+           rmdir/5,
+           setattr/7,
 %%            setlk/7,
 %%            setxattr/7,
 %%            statfs/4,
 %%            symlink/6,
-%%            unlink/5
+           unlink/5
 
           ]).
 
@@ -266,20 +266,15 @@ lookup(Ctx, ParentIno, BinPath, Cont, State) ->
 lookup_async(Ctx, ParentIno, BinPath, Cont, State) ->
     case ets:lookup(State#amqpfs.inodes, ParentIno) of
         [{ParentIno,Path}] ->
-            Path1 = case Path of
-                        "/" -> "";
-                        _ -> Path
-                    end,
             Result =
             case ets:lookup(State#amqpfs.names, Path) of
                 [{Path, { ParentIno, {directory, on_demand}}}] ->
                     Response = remote_list_dir(Path, Ctx, State),
                     List = lists:map(fun ({P,E}) -> 
-                                             Path2 = Path1 ++ "/" ++ P,
-                                             {_Ino, _} = make_inode(Path2, E, State),
+                                             {_Ino, _} = make_inode(amqpfs_util:concat_path([Path, P]), E, State),
                                              P
                                      end, Response),
-                    lookup_impl(BinPath, Path1, List, Ctx, State);
+                    lookup_impl(BinPath, Path, List, Ctx, State);
                 _ ->
                     #fuse_reply_err{ err = enoent }
             end,
@@ -291,7 +286,7 @@ lookup_async(Ctx, ParentIno, BinPath, Cont, State) ->
 lookup_impl(BinPath, Path, List, Ctx, State) ->
     case lists:any(fun (P) -> P == BinPath end,  lists:map(fun erlang:list_to_binary/1, List)) of
         true -> % there is something
-            Path2 = Path ++ "/" ++ binary_to_list(BinPath),
+            Path2 = amqpfs_util:concat_path([Path,binary_to_list(BinPath)]),
             case ets:lookup(State#amqpfs.names, Path2) of
                 [{Path2, {Ino, _}}] ->
                     Stat = remote_getattr(Path2, Ctx, State),
@@ -373,15 +368,11 @@ readdir_async(Ctx, Ino, Size, Offset, _Fi, Cont, #amqpfs{}=State) ->
     {Contents, _} =
         case ets:lookup(State#amqpfs.inodes, Ino) of
             [{Ino,Path}] ->
-                Path1 = case Path of
-                            "/" -> "";
-                            _ -> Path
-                        end,
                 case ets:lookup(State#amqpfs.names, Path) of
                     [{Path, { Ino, {directory, on_demand}}}] ->
                         Response = remote_list_dir(Path, Ctx, State),
                         lists:foldl(fun ({P, E}, {L, Acc}) -> 
-                                            Path2 = Path1 ++ "/" ++ P,
+                                            Path2 = amqpfs_util:concat_path([Path, P]),
                                             make_inode(Path2, E, State),
                                             case ets:lookup(State#amqpfs.names, Path2) of                      
                                                 [{Path2, {_ChildIno, _}}] ->
@@ -509,7 +500,7 @@ mknod_async(Ctx, ParentIno, Name, Mode, _Dev, Cont, State) ->
                             {link, on_demand} % links are not yet supported, though
                     end,
                     Param = #fuse_entry_param {
-                      ino = make_inode(Path ++ "/" ++ Name, Extra, State),
+                      ino = make_inode(amqpfs_util:concat_path([Path,Name]), Extra, State),
                       generation = 1,
                       attr = remote_getattr(Path, Ctx, State),
                       attr_timeout_ms = 100,
@@ -547,7 +538,7 @@ create_async(Ctx, ParentIno, Name, Mode, Fi, Cont, State) ->
                         ?S_IFLNK ->
                             {link, on_demand} % links are not yet supported, though
                     end,
-                    make_inode(Path ++ "/" ++ Name, Extra, State),
+                    make_inode(amqpfs_util:concat_path([Path,Name]), Extra, State),
                     Response = remote(Path, {open, Path, Fi}, Ctx, State),
                     case Response of
                         ok -> #fuse_reply_open{fuse_file_info = Fi};
@@ -606,9 +597,21 @@ mkdir(Ctx, ParentIno, Name, Mode, Cont, State) ->
 %%     io:format("ni: rename~n"),
 %%     erlang:throw(not_implemented).
 
-%% rmdir(_Ctx, _Inode, _Name, _Cont, _State) ->
-%%     io:format("ni: rmdir~n"),
-%%     erlang:throw(not_implemented).
+rmdir(Ctx, ParentIno, Name, Cont, State) ->
+    spawn_link(fun () -> rmdir_async(Ctx, ParentIno, Name, Cont, State) end),
+    { noreply, State }.
+
+rmdir_async(Ctx, ParentIno, Name, Cont, State) ->
+    Result =
+    case ets:lookup(State#amqpfs.inodes, ParentIno) of
+        [{ParentIno,Path}] ->
+            FullPath = amqpfs_util:concat_path([Path,binary_to_list(Name)]),
+            remote(Path, {rmdir, FullPath}, Ctx, State);
+        _ ->
+            enoent
+    end,
+    fuserlsrv:reply (Cont, #fuse_reply_err{ err = Result }).
+            
 
 setattr(Ctx, Ino, Attr, ToSet, Fi, Cont, State) ->
     spawn_link(fun () -> setattr_async(Ctx, Ino, Attr, ToSet, Fi, Cont, State) end),
@@ -647,9 +650,21 @@ setattr_async(Ctx, Ino, Attr, ToSet, _Fi, Cont, State) ->
 %%     io:format("ni: symlink~n"),
 %%     erlang:throw(not_implemented).
 
-%% unlink(_Ctx, _Inode, _Name, _Cont, _State) ->
-%%     io:format("ni: unlink~n"),
-%%     erlang:throw(not_implemented).
+unlink(Ctx, ParentIno, Name, Cont, State) ->
+    spawn_link(fun () -> unlink_async(Ctx, ParentIno, Name, Cont, State) end),
+    { noreply, State }.
+
+unlink_async(Ctx, ParentIno, Name, Cont, State) ->
+    Result =
+    case ets:lookup(State#amqpfs.inodes, ParentIno) of
+        [{ParentIno,Path}] ->
+            FullPath = amqpfs_util:concat_path([Path, Name]),
+            remote(Path, {remove, FullPath}, Ctx, State);
+        _ ->
+            enoent
+    end,
+    fuserlsrv:reply (Cont, #fuse_reply_err{ err = Result }).
+            
 %%%%%%%%%%%
 
 take_while (_, _, []) -> 

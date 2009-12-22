@@ -56,6 +56,10 @@ handle_info_async({#'basic.deliver'{consumer_tag=_ConsumerTag, delivery_tag=_Del
                     send_response(MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(create, [Path, Name, Mode, ReqState], ReqState)), ReqState);
                 {create, Path, Name, Mode} when (Mode band ?S_IFMT) =:= ?S_IFDIR ->
                     send_response(MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(create_dir, [Path, Name, Mode, ReqState], ReqState)), ReqState);                
+                {rmdir, Path} ->
+                    send_response(MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(rmdir, [Path, ReqState], ReqState)), ReqState);
+                {remove, Path} ->
+                    send_response(MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(remove, [Path, ReqState], ReqState)), ReqState);
                 {open, Path, Fi} ->
                     send_response(MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(open, [Path, Fi, ReqState], ReqState)), ReqState);
                 {read, Path, Size, Offset} ->

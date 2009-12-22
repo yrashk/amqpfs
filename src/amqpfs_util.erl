@@ -1,7 +1,8 @@
 -module(amqpfs_util).
 -export([path_to_matching_routing_key/1,path_to_routing_key/1, setup/1, setup_provider_queue/2, provider_queue_name/1, announce_queue_name/0, announce_queue_name/1, announce_queue_name/2, response_queue_name/0, response_queue_name/1,
          decode_payload/2,
-         datetime_to_unixtime/1
+         datetime_to_unixtime/1,
+         concat_path/1
         ]).
 
 -include_lib("amqpfs/include/amqpfs.hrl").
@@ -89,3 +90,9 @@ decode_payload(ContentType, Payload) ->
 
 datetime_to_unixtime(DateTime) ->
     calendar:datetime_to_gregorian_seconds(DateTime)-calendar:datetime_to_gregorian_seconds(?EPOCH_START).
+
+concat_path(["/"|_]=P) ->
+    lists:concat(P);
+concat_path([H|T]) ->
+    T1 = "/" ++ T,
+    lists:flatten([H|T1]).
