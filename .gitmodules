@@ -1,15 +1,15 @@
 [submodule "vendor/fuserl"]
 	path = vendor/fuserl
-	url = gitosis@git.scallable.ca:fuserl.git
+	url = git://github.com/scallable/fuserl.git
 [submodule "vendor/rabbitmq-erlang-client"]
 	path = vendor/rabbitmq-erlang-client
-	url = gitosis@git.scallable.ca:rabbitmq-erlang-client.git
+	url = git://github.com/scallable/rabbitmq-erlang-client.git
 [submodule "vendor/rabbitmq-codegen"]
 	path = vendor/rabbitmq-codegen
-	url = gitosis@git.scallable.ca:rabbitmq-codegen.git
+	url = git://github.com/scallable/rabbitmq-codegen.git
 [submodule "vendor/rabbitmq-server"]
 	path = vendor/rabbitmq-server
-	url = gitosis@git.scallable.ca:rabbitmq-server.git
+	url = git://github.com/scallable/rabbitmq-server.git
 [submodule "vendor/erabbitmq"]
 	path = vendor/erabbitmq
-	url = gitosis@git.scallable.ca:erabbitmq.git
+	url = git://github.com/scallable/erabbitmq.git
