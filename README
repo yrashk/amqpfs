@@ -1,0 +1,26 @@
+Requirements
+============
+
+* Erlang R13B03
+* make
+* gcc
+* fuse (or macfuse on Mac OS X)
+
+Build instructions
+==================
+
+$ git submodule init
+$ git submodule update
+$ mkdir ./amqpfs # (for default mount point)
+$ make
+$ make rabbit # (in a separate terminal/screen session, as it starts RabbitMQ not as a daemon)
+$ make run # or
+$ make run-simple # or
+$ NODE=your@rabbitnode make run-mq #
+
+Platforms Compatibilities
+=========================
+
+* Ubuntu 9.10 x86, fuse 2.7.4 (32-bit) *WORKS*
+* Intel Mac OS X 10.5.8, macfuse 2.0.3 (haven't been tested for a while) *SUPPOSEDLY WORKS*
+* Intel Mac OS X 10.6.2, macfuse 2.0.3-2.1.7 *DOESN'T WORK*
