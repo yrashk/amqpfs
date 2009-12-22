@@ -27,28 +27,28 @@ init(State) ->
     State.
 
 
-list_dir(_, _State) ->
+list_dir(_Path, _State) ->
     [].
 
-create(_,_,_,_) ->
+create(_Path,_Name,_Mode,_State) ->
     enotsup.
 
-create_dir(_,_,_,_) ->
+create_dir(_Path,_Name,_Mode,_State) ->
     enotsup.
 
-rmdir(_,_) ->
+rmdir(_Path,_State) ->
     enotsup.
 
-remove(_,_) ->    
+remove(_Path,_State) ->    
     enotsup.
 
-rename(_,_,_State) ->
+rename(_Path,_NewPath,_State) ->
     enotsup.
 
-open(_, _Fi, _State) ->
+open(_Path, _Fi, _State) ->
     ok.
 
-release(_, _Fi, _State) ->
+release(_Path, _Fi, _State) ->
     ok.
 
 read(Path, Size, Offset, State) ->
@@ -105,18 +105,18 @@ writable(_Path, _Group, _State) ->
 executable(_Path, _Group, _State) ->
     false.
 
-uid(_, #amqpfs_provider_state{ request_headers = Headers }) ->
+uid(_Path, #amqpfs_provider_state{ request_headers = Headers }) ->
     {value, {<<"uid">>, _, Val}} = lists:keysearch(<<"uid">>, 1, Headers),
     Val.
 
-gid(_, #amqpfs_provider_state{ request_headers = Headers }) ->
+gid(_Path, #amqpfs_provider_state{ request_headers = Headers }) ->
     {value, {<<"gid">>, _, Val}} = lists:keysearch(<<"gid">>, 1, Headers),
     Val.
 
-get_lock(_, _, _Lock, _State) ->
+get_lock(_Path, _Fi, _Lock, _State) ->
     #flock{}.
 
-set_lock(_,_,_Lock,_Sleep,_State)->
+set_lock(_Path,_Fi,_Lock,_Sleep,_State)->
     enotsup.
 
 resize(_Path, NewSize, _State) ->
@@ -196,7 +196,7 @@ getattr(Path,State) ->
 handle_info(_Msg, _State) ->
     ignore.
 
-ttl(_, _) ->
+ttl(_Path, _State) ->
     0.
 
 allow_request(_State) ->
