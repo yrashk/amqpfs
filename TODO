@@ -8,8 +8,8 @@
 ** TODO statfs
 ** TODO symlink
 ** DONE unlink
-** TODO setlk
-** TODO getlk
+** DONE setlk
+** DONE getlk
 * TODO Finish incomplete implementations of these calls:
 ** TODO readlink
 ** TODO access

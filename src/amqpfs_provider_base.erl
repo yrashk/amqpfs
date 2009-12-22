@@ -12,6 +12,7 @@
          write/4, output/4,
          readable/3, writable/3, executable/3,
          uid/2, gid/2,
+         get_lock/4, set_lock/5,
          handle_info/2,
          ttl/2,
          allow_request/1]).
@@ -108,6 +109,11 @@ gid(_, #amqpfs_provider_state{ request_headers = Headers }) ->
     {value, {<<"gid">>, _, Val}} = lists:keysearch(<<"gid">>, 1, Headers),
     Val.
 
+get_lock(_, _, _Lock, _State) ->
+    #flock{}.
+
+set_lock(_,_,_Lock,_Sleep,_State)->
+    enotsup.
 
 resize(_Path, NewSize, _State) ->
     NewSize.

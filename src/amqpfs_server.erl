@@ -27,14 +27,14 @@
            release/5,
            releasedir/5,
 
-  %%          getlk/6,
+           getlk/6,
+           setlk/7,
 %%            link/6,
            mkdir/6,
 %%            removexattr/5,
 %%            rename/7,
            rmdir/5,
            setattr/7,
-%%            setlk/7,
 %%            setxattr/7,
 %%            statfs/4,
 %%            symlink/6,
@@ -577,9 +577,24 @@ release_async(Ctx, Ino, Fi, Cont, State) ->
 releasedir(_Ctx, _Ino, _Fi, _Cont, State) ->
   { #fuse_reply_err{ err = ok }, State }.
 
-%% getlk(_Ctx, _Inode, _Fi, _Lock, _Cont, _State) ->
-%%     io:format("ni: getlk~n"),
-%%     erlang:throw(not_implemented).
+getlk(Ctx, Ino, Fi, Lock, Cont, State) ->
+    spawn_link(fun () -> getlk_async(Ctx, Ino, Fi, Lock, Cont, State) end),
+    {noreply, State}.
+
+getlk_async(Ctx, Ino, Fi, Lock, Cont, State) ->
+    Result =
+        case ets:lookup(State#amqpfs.inodes, Ino) of
+            [{Ino,Path}] ->
+                case remote(Path, {get_lock, Path, Fi, Lock}, Ctx, State) of
+                    #flock{}=Flock ->
+                        #fuse_reply_lock{ flock = Flock };
+                    Err ->
+                        #fuse_reply_err{ err = Err }
+                end;
+        _ ->
+                #fuse_reply_err{ err = enoent }
+        end,
+    fuserlsrv:reply (Cont, Result).
 
 %% link(_Ctx, _Ino, _NewParent, _NewName, _Cont, _State) ->
 %%     io:format("ni: link~n"),
@@ -633,9 +648,23 @@ setattr_async(Ctx, Ino, Attr, ToSet, _Fi, Cont, State) ->
     fuserlsrv:reply (Cont, Result).
 
 
-%% setlk(_Ctx, _Inode, _Fi, _Lock, _Sleep, _Cont, _State) ->
-%%     io:format("ni: setlk~n"),
-%%     erlang:throw(not_implemented).
+
+setlk(Ctx, Ino, Fi, Lock, Sleep, Cont, State) ->
+    spawn_link(fun () -> setlk_async(Ctx, Ino, Fi, Lock, Sleep, Cont, State) end),
+    {noreply, State}.
+
+setlk_async(Ctx, Ino, Fi, Lock, Sleep, Cont, State) ->
+    Result =
+        case ets:lookup(State#amqpfs.inodes, Ino) of
+            [{Ino,Path}] ->
+                case remote(Path, {set_lock, Path, Fi, Lock, Sleep}, Ctx, State) of
+                    Res ->
+                        #fuse_reply_err{ err = Res }
+                end;
+        _ ->
+                #fuse_reply_err{ err = enoent }
+        end,
+    fuserlsrv:reply (Cont, Result).
 
 %% setxattr(_Ctx, _Inode, _Name, _Value, _Flags, _Cont, _State) ->
 %%     io:format("ni: setxattr~n"),
