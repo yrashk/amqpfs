@@ -29,6 +29,7 @@
 * DONE Consider counting st_nlinks for directories properly
 * DONE . and .. should get proper uid/gid (now they are just 0/0), as well as permissions, actually
 * DONE Add readable(Path, owner|group|other, State), writable(Path, ..., ...) and executable(Path, ..., ...) callbacks
+* TODO Directory announcement cancellation support
 * TODO Do something about namings in mq provider as some names can contain characters like "/". Or just pay less attention to mq_amqpfs_provider and move it to tests/ or samples/ :)
 * TODO Consider passing Fi for write and read
 * TODO Sometimes some things in Makefile make it build some deps more than once, but not each time (after fresh clones, supposedly)
