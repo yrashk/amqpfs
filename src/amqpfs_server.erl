@@ -140,8 +140,8 @@ handle_info({#'basic.deliver'{consumer_tag=ConsumerTag, delivery_tag=_DeliveryTa
     ets:insert(ResponseBuffers, {Route, Response, TTL}),
     case ets:lookup(Tab, Route) of 
         [{Route, Pid, Path, Command}] ->
-            {{PolicyM, PolicyF, PolicyA}, {ReduceM, ReduceF, ReduceA}} = get_response_policy(Path, Command, State),
-            case apply(PolicyM, PolicyF, PolicyA ++ [Route, Response, State]) of
+            {{CollectM, CollectF, CollectA}, {ReduceM, ReduceF, ReduceA}} = get_response_policy(Path, Command, State),
+            case apply(CollectM, CollectF, CollectA ++ [Route, Response, State]) of
                 last_response ->
                     Responses = ets:lookup(ResponseBuffers, Route),
                     ets:delete(ResponseBuffers, Route),
@@ -200,19 +200,19 @@ get_response_policy(Path, Command, #amqpfs{ response_policies = ResponsePolicies
             get_response_policy(filename:dirname(Path), Command, State);
         [{Path, Policies}] ->
             CommandName = element(1,Command),
-            {value, {CommandName, Policy, Reducer}} = lists:keysearch(CommandName, 1, Policies),
-            {normalize_policy_function(Policy), normalize_reduce_function(Reducer)};
+            {value, {CommandName, Collect, Reduce}} = lists:keysearch(CommandName, 1, Policies),
+            {normalize_collect_function(Collect), normalize_reduce_function(Reduce)};
         _ ->
             never_happens
     end.
 
-normalize_policy_function(Fun) when is_atom(Fun) ->
-    {amqpfs_response_policy, Fun, []};
-normalize_policy_function({Fun, Args}) when is_atom(Fun) andalso is_list(Args) ->
-    {amqpfs_response_policy, Fun, Args};
-normalize_policy_function({Module, Fun}) when is_atom(Module) andalso is_atom(Fun) ->
+normalize_collect_function(Fun) when is_atom(Fun) ->
+    {amqpfs_response_collect, Fun, []};
+normalize_collect_function({Fun, Args}) when is_atom(Fun) andalso is_list(Args) ->
+    {amqpfs_response_collect, Fun, Args};
+normalize_collect_function({Module, Fun}) when is_atom(Module) andalso is_atom(Fun) ->
     {Module, Fun, []};
-normalize_policy_function({Module, Fun, Args}) when is_atom(Module) andalso is_atom(Fun) andalso is_list(Args) ->
+normalize_collect_function({Module, Fun, Args}) when is_atom(Module) andalso is_atom(Fun) andalso is_list(Args) ->
     {Module, Fun, Args}.
 
 normalize_reduce_function(Fun) when is_atom(Fun) ->
