@@ -1,3 +1,16 @@
+Introduction
+============
+
+AMQPFS is Filesystem as API that works through AMQPFS, all filesystem providers are available through AMQP bus and can be distributed
+in the network.
+
+What's the point? Why one needs this? Well, this project started as a way to integrate some third-party software while maintaining no real files or directories for them. 
+For example, it could be used to serve configuration files, receive logs and such. Its use is virtually unlimited.
+
+
+(Please note that AMQPFS is *very* immature at this point. Some things will definitely be changed, not all calls are implemented and I am
+ sure there are at least some bugs)
+
 Requirements
 ============
 
@@ -24,3 +37,15 @@ Platforms Compatibilities
 * Ubuntu 9.10 x86, fuse 2.7.4 (32-bit) *WORKS*
 * Intel Mac OS X 10.5.8, macfuse 2.0.3 (haven't been tested for a while) *SUPPOSEDLY WORKS*
 * Intel Mac OS X 10.6.2, macfuse 2.0.3-2.1.7 *DOESN'T WORK*
+
+Examples
+========
+
+For examples, take a look at src/amqpfs_provider_base.erl, src/root_amqpfs_provider.erl, src/dot_amqpfs_provider.erl, src/mq_amqpfs_provider and tests/simple_amqpfs_provider.erl
+
+Also, you can find some intro example on how to change response collection and reducing policies at https://gist.github.com/98fadf2f777b178ffbf0
+
+Contact
+=======
+
+Feel free to contact Yurii Rashkovskii at yrashk@scallable.com if you have any questions.
