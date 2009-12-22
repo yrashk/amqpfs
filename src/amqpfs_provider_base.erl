@@ -79,10 +79,10 @@ size(Path, State) ->
     end.
 
 atime(_Path, _State) ->
-    {{1970,1,1},{00,00,00}}.
+    erlang:localtime().
 
 mtime(_Path, _State) ->
-    {{1970,1,1},{00,00,00}}.
+    erlang:localtime().
 
 readable(_Path, _Group, _State) ->
     true.
