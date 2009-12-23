@@ -64,6 +64,7 @@ start_link (LinkedIn, Dir, MountOpts) ->
 %-=====================================================================-
 
 init ([]) ->
+    amqpfs_util:print_banner(),
     {ok, AmqpConn} = erabbitmq_connections:start(),
     {ok, AmqpChannel} = erabbitmq_channels:open(AmqpConn),
     amqpfs_util:setup(AmqpChannel),

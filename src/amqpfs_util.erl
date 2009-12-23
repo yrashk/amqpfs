@@ -2,7 +2,9 @@
 -export([path_to_matching_routing_key/1,path_to_routing_key/1, setup/1, setup_provider_queue/2, provider_queue_name/1, announce_queue_name/0, announce_queue_name/1, announce_queue_name/2, response_queue_name/0, response_queue_name/1,
          decode_payload/2,
          datetime_to_unixtime/1,
-         concat_path/1
+         concat_path/1,
+
+         print_banner/0
         ]).
 
 -include_lib("amqpfs/include/amqpfs.hrl").
@@ -96,3 +98,16 @@ concat_path(["/"|_]=P) ->
 concat_path([H|T]) ->
     T1 = "/" ++ T,
     lists:flatten([H|T1]).
+
+print_banner() ->
+    io:format("~n
+                                ___    __  _______   ____  ___________
+AMQPFS v0.1                    /   |  /  |/  / __ \\ / __ \\/ ____/ ___/
+Copyright (c) 2009,           / /| | / /|_/ / / / // /_/ / /_   \\__ \\ 
+ 0840536 B.C. Ltd            / ___ |/ /  / / /_/ // ____/ __/  ___/ / 
+``Filesystem as API``       /_/  |_/_/  /_/\\___\\_|_/   /_/    /____/  
+
+Available under MIT License. 
+
+").
+                                          
