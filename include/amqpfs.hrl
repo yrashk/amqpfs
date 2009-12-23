@@ -10,6 +10,8 @@
         {
           module,
           args = [],
+          app_id,
+          user_id,
           connection,
           channel,
           request_headers,
@@ -20,6 +22,7 @@
 -record (amqpfs, { inodes, 
                    names,
                    announcements,
+                   providers,
                    response_routes,
                    response_cache,
                    response_policies,

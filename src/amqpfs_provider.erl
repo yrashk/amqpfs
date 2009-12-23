@@ -30,7 +30,7 @@ start(Module, Args) ->
     gen_server:start(?MODULE, [Module, Args], []).
 
 init([Module, Args]) ->
-    State0 = #amqpfs_provider_state{ module = Module, args = Args },
+    State0 = #amqpfs_provider_state{ module = Module, args = Args},
     State1 = setup(State0),
     State2 = call_module(init, [State1], State1),
     {ok, State2}.
@@ -45,6 +45,17 @@ handle_cast(_, State) ->
 handle_info(Msg, State) ->
     spawn(fun () -> handle_info_async(Msg, State) end),
     {noreply, State}.
+
+handle_info_async({#'basic.deliver'{consumer_tag=_ConsumerTag, delivery_tag=_DeliveryTag, redelivered=_Redelivered, exchange = <<"amqpfs.provider">>, routing_key=_RoutingKey}, Content}, State) ->
+    #amqp_msg{payload = Payload } = Content,
+    #'P_basic'{content_type = ContentType, headers = _Headers, message_id = MessageId, reply_to = ReplyTo} = Content#amqp_msg.props,
+    Command = amqpfs_util:decode_payload(ContentType, Payload),
+    case Command of
+        ping ->
+            send_response(ReplyTo, MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(pong), State);
+        _ ->
+            ignore
+    end;
 
 handle_info_async({#'basic.deliver'{consumer_tag=_ConsumerTag, delivery_tag=_DeliveryTag, redelivered=_Redelivered, exchange = <<"amqpfs">>, routing_key=_RoutingKey}, Content}, State) ->
     #amqp_msg{payload = Payload } = Content,
@@ -113,10 +124,12 @@ terminate(_Reason, _State) ->
 %%%%
 
 
-send_response(ReplyTo, MessageId, ContentType, Headers, Content, #amqpfs_provider_state{channel = Channel}) ->
+send_response(ReplyTo, MessageId, ContentType, Headers, Content, #amqpfs_provider_state{channel = Channel, app_id = AppId, user_id = UserId}) ->
     amqp_channel:call(Channel, #'basic.publish'{exchange = <<"amqpfs.response">>, routing_key = ReplyTo},
                       {amqp_msg, #'P_basic'{correlation_id = MessageId,
                                             content_type = ContentType,
+                                            app_id = AppId,
+                                            user_id = UserId,
                                             headers = Headers
                                             },
                        Content}).
@@ -131,13 +144,13 @@ ttl(Path, State) ->
 
 %%%%
 
-announce(directory, Name, #amqpfs_provider_state{ channel = Channel } = State) ->
+announce(directory, Name, #amqpfs_provider_state{ channel = Channel, app_id = AppId, user_id = UserId } = State) ->
     setup_listener(Name, State),
-    amqpfs_announce:directory(Channel, Name).
+    amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs.announce">>}, {amqp_msg, #'P_basic'{content_type = ?CONTENT_TYPE_BERT, app_id = AppId, user_id = UserId}, term_to_binary({announce, directory, {Name,on_demand}})}).
 
 %%%% 
 
-setup(#amqpfs_provider_state{ module = Module, args = Args }=State) ->
+setup(#amqpfs_provider_state{}=State) ->
     Credentials = call_module(amqp_credentials, [], State),
     {ok, Connection} = erabbitmq_connections:start(#amqp_params{username = list_to_binary(proplists:get_value(username, Credentials, "guest")),
                                                                 password = list_to_binary(proplists:get_value(password, Credentials, "guest")),
@@ -148,18 +161,23 @@ setup(#amqpfs_provider_state{ module = Module, args = Args }=State) ->
                                                                }),
     {ok, Channel} = erabbitmq_channels:open(Connection),
     amqpfs_util:setup(Channel),
-    amqpfs_util:setup_provider_queue(Channel, proplists:get_value(name, Args, Module)),
-    State#amqpfs_provider_state { connection = Connection, channel = Channel }.
+    amqpfs_util:setup_provider_queue(Channel, provider_name(State)),
+    AppId = list_to_binary(amqpfs_util:term_to_string(provider_name(State))),
+    UserId = list_to_binary(amqpfs_util:term_to_string({node(), now()})),
+    State#amqpfs_provider_state { connection = Connection, channel = Channel, app_id = AppId, user_id = UserId }.
     
 
 
-setup_listener(Name, #amqpfs_provider_state{ module = Module, channel = Channel, args = Args}) ->
-    ProviderName = proplists:get_value(name, Args, Module),
-    Queue = amqpfs_util:provider_queue_name(ProviderName),
+setup_listener(Name, #amqpfs_provider_state{channel = Channel, user_id = UserId}=State) ->
+    Queue = amqpfs_util:provider_queue_name(provider_name(State)),
     #'queue.bind_ok'{} = amqp_channel:call(Channel, #'queue.bind'{
-                                                                  queue = Queue, exchange = <<"amqpfs">>,
-                                                                  routing_key = amqpfs_util:path_to_matching_routing_key(Name),
-                                                                  nowait = false, arguments = []}),
+                                             queue = Queue, exchange = <<"amqpfs">>,
+                                             routing_key = amqpfs_util:path_to_matching_routing_key(Name),
+                                             nowait = false, arguments = []}),
+    #'queue.bind_ok'{} = amqp_channel:call(Channel, #'queue.bind'{
+                                             queue = Queue, exchange = <<"amqpfs.provider">>,
+                                             routing_key = UserId,
+                                             nowait = false, arguments = []}),
     #'basic.consume_ok'{consumer_tag = ConsumerTag} = amqp_channel:subscribe(Channel, #'basic.consume'{
                                                                                                        queue = Queue,
                                                                                                        consumer_tag = <<"">>,
@@ -186,3 +204,8 @@ call_module(F, A, Module) when is_atom(Module) ->
         Result ->
             Result
     end.
+
+%%
+
+provider_name(#amqpfs_provider_state{ module = Module, args = Args }) ->
+    proplists:get_value(name, Args, Module).
