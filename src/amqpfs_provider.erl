@@ -137,7 +137,7 @@ announce(directory, Name, #amqpfs_provider_state{ channel = Channel } = State) -
 
 %%%% 
 
-setup(#amqpfs_provider_state{ module = Module, args = Args }=State) ->
+setup(#amqpfs_provider_state{}=State) ->
     Credentials = call_module(amqp_credentials, [], State),
     {ok, Connection} = erabbitmq_connections:start(#amqp_params{username = list_to_binary(proplists:get_value(username, Credentials, "guest")),
                                                                 password = list_to_binary(proplists:get_value(password, Credentials, "guest")),
@@ -148,14 +148,13 @@ setup(#amqpfs_provider_state{ module = Module, args = Args }=State) ->
                                                                }),
     {ok, Channel} = erabbitmq_channels:open(Connection),
     amqpfs_util:setup(Channel),
-    amqpfs_util:setup_provider_queue(Channel, proplists:get_value(name, Args, Module)),
+    amqpfs_util:setup_provider_queue(Channel, provider_name(State)),
     State#amqpfs_provider_state { connection = Connection, channel = Channel }.
     
 
 
-setup_listener(Name, #amqpfs_provider_state{ module = Module, channel = Channel, args = Args}) ->
-    ProviderName = proplists:get_value(name, Args, Module),
-    Queue = amqpfs_util:provider_queue_name(ProviderName),
+setup_listener(Name, #amqpfs_provider_state{channel = Channel}=State) ->
+    Queue = amqpfs_util:provider_queue_name(provider_name(State)),
     #'queue.bind_ok'{} = amqp_channel:call(Channel, #'queue.bind'{
                                                                   queue = Queue, exchange = <<"amqpfs">>,
                                                                   routing_key = amqpfs_util:path_to_matching_routing_key(Name),
@@ -186,3 +185,8 @@ call_module(F, A, Module) when is_atom(Module) ->
         Result ->
             Result
     end.
+
+%%
+
+provider_name(#amqpfs_provider_state{ module = Module, args = Args }) ->
+    proplists:get_value(name, Args, Module).
