@@ -21,4 +21,4 @@ init ([]) ->
                          permanent, 3000, worker, [ dot_amqpfs_provider ]},
     Srv = {amqpfs_server, {amqpfs_server, start_link, []},
            permanent, 10000, worker, [ amqpfs_server ]},
-    {ok,{{one_for_one,3,10}, [Inode, RootAmqpfsProvider, DotAmqpfsProvider, Srv]}}.
+    {ok,{{one_for_one,3,10}, [Inode, Srv, RootAmqpfsProvider, DotAmqpfsProvider]}}.
