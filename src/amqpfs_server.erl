@@ -121,6 +121,7 @@ init ([]) ->
                      amqp_consumer_tag = ConsumerTag,
                      amqp_response_consumer_tag = ResponseConsumerTag
                   },
+    spawn_link(fun () -> heartbeat(State) end),
     { ok, State }.
 
 code_change (_OldVsn, State, _Extra) -> { ok, State }.
@@ -800,7 +801,25 @@ unlink_async(Ctx, ParentIno, Name, Cont, State) ->
             enoent
     end,
     fuserlsrv:reply (Cont, #fuse_reply_err{ err = Result }).
-            
+       
+%%%%%%%%%%%
+-define(HEARTBEAT_INTERVAL, 10000).
+-define(PING_THRESHOLD, 60).
+
+heartbeat(#amqpfs{ amqp_channel = Channel, providers = Providers } = State) ->
+    ThresholdTime = amqpfs_util:datetime_to_unixtime(calendar:local_time()) - ?PING_THRESHOLD,
+    case ets:select(Providers, [{{'$1','_','$2'}, [{'=<','$2',ThresholdTime}],['$1']}]) of
+        [] ->
+            ok;
+        Matches when is_list(Matches) ->
+            lists:map(fun (UserId) ->
+                              amqp_channel:call(Channel, #'basic.publish'{exchange = <<"amqpfs.provider">>, routing_key = UserId}, 
+                              {amqp_msg, #'P_basic'{reply_to = amqpfs_util:response_routing_key(), headers = env_headers(State) }, term_to_binary(ping)})
+                      end, Matches)
+    end,
+    timer:sleep(?HEARTBEAT_INTERVAL),
+    heartbeat(State).
+     
 %%%%%%%%%%%
 
 take_while (_, _, []) -> 
