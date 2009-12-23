@@ -110,7 +110,7 @@ init ([]) ->
 
     State = #amqpfs{ inodes = ets:new(inodes, [public, ordered_set]),
                      names = ets:new(names, [public, set]),
-                     announcements = ets:new(announcements, [public, duplicate_bag]),
+                     announcements = ets:new(announcements, [public, bag]),
                      response_routes = ets:new(response_routes, [public, set]),
                      response_cache = ets:new(response_cache, [public, set]),
                      response_policies = ets:new(response_policies, [public, set]),
@@ -161,9 +161,9 @@ handle_info({#'basic.deliver'{consumer_tag=ConsumerTag, delivery_tag=_DeliveryTa
                               exchange = <<"amqpfs.announce">>, routing_key=_RoutingKey}, Content}, 
             #amqpfs{amqp_consumer_tag = ConsumerTag}=State) ->
     #amqp_msg{payload = Payload } = Content,
-    #'P_basic'{content_type = ContentType, headers = _Headers} = Content#amqp_msg.props,
+    #'P_basic'{content_type = ContentType, user_id = UserId, app_id = AppId, headers = _Headers} = Content#amqp_msg.props,
     Command = amqpfs_util:decode_payload(ContentType, Payload),
-    {noreply, handle_command(Command, State)};
+    {noreply, handle_command(Command, UserId, AppId, State)};
 
 handle_info({set_response_policies, Path, Policies}, State) ->
     set_response_policies(Path, Policies, State),
@@ -174,13 +174,13 @@ handle_info (_Msg, State) -> { noreply, State }.
 
 terminate (_Reason, _State) -> ok.
 
-handle_command({announce, directory, {Path, Contents}}, #amqpfs{ announcements = Announcements} = State) ->
+handle_command({announce, directory, {Path, Contents}}, UserId, AppId, #amqpfs{ announcements = Announcements} = State) ->
     {_, State1} = make_inode(Path, {directory, Contents}, State),
-    ets:insert(Announcements, {Path, {directory, Contents}}),
+    ets:insert(Announcements, {Path, {directory, Contents}, UserId, AppId}),
     set_new_response_policies(Path, amqpfs_response_policies:new(), State),
     State1;
 
-handle_command({cancel, directory, _Path}, State) ->
+handle_command({cancel, directory, _Path}, _UserId, _AppId, State) ->
     State.
 
 
@@ -826,11 +826,11 @@ path_to_announced(Path, #amqpfs{ announcements = Announcements }=State) ->
     case ets:lookup(Announcements, Path) of
         [] ->
             path_to_announced(filename:dirname(Path), State);
-        [{Path, _}] ->
+        [{Path, _,_,_}] ->
             Path;
         Paths when is_list(Paths) andalso length(Paths) > 1 ->
             % that's a bag
-            {Path, _} = hd(Paths),
+            {Path, _, _, _} = hd(Paths),
             Path
     end.
 

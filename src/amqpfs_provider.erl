@@ -30,7 +30,7 @@ start(Module, Args) ->
     gen_server:start(?MODULE, [Module, Args], []).
 
 init([Module, Args]) ->
-    State0 = #amqpfs_provider_state{ module = Module, args = Args },
+    State0 = #amqpfs_provider_state{ module = Module, args = Args},
     State1 = setup(State0),
     State2 = call_module(init, [State1], State1),
     {ok, State2}.
@@ -113,10 +113,12 @@ terminate(_Reason, _State) ->
 %%%%
 
 
-send_response(ReplyTo, MessageId, ContentType, Headers, Content, #amqpfs_provider_state{channel = Channel}) ->
+send_response(ReplyTo, MessageId, ContentType, Headers, Content, #amqpfs_provider_state{channel = Channel, app_id = AppId, user_id = UserId}) ->
     amqp_channel:call(Channel, #'basic.publish'{exchange = <<"amqpfs.response">>, routing_key = ReplyTo},
                       {amqp_msg, #'P_basic'{correlation_id = MessageId,
                                             content_type = ContentType,
+                                            app_id = AppId,
+                                            user_id = UserId,
                                             headers = Headers
                                             },
                        Content}).
@@ -131,9 +133,9 @@ ttl(Path, State) ->
 
 %%%%
 
-announce(directory, Name, #amqpfs_provider_state{ channel = Channel } = State) ->
+announce(directory, Name, #amqpfs_provider_state{ channel = Channel, app_id = AppId, user_id = UserId } = State) ->
     setup_listener(Name, State),
-    amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs.announce">>}, {amqp_msg, #'P_basic'{}, term_to_binary({announce, directory, {Name,on_demand}})}).
+    amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs.announce">>}, {amqp_msg, #'P_basic'{content_type = ?CONTENT_TYPE_BERT, app_id = AppId, user_id = UserId}, term_to_binary({announce, directory, {Name,on_demand}})}).
 
 %%%% 
 
@@ -149,7 +151,9 @@ setup(#amqpfs_provider_state{}=State) ->
     {ok, Channel} = erabbitmq_channels:open(Connection),
     amqpfs_util:setup(Channel),
     amqpfs_util:setup_provider_queue(Channel, provider_name(State)),
-    State#amqpfs_provider_state { connection = Connection, channel = Channel }.
+    AppId = list_to_binary(amqpfs_util:term_to_string(provider_name(State))),
+    UserId = list_to_binary(amqpfs_util:term_to_string({node(), now()})),
+    State#amqpfs_provider_state { connection = Connection, channel = Channel, app_id = AppId, user_id = UserId }.
     
 
 

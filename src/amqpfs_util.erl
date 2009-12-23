@@ -5,7 +5,9 @@
          decode_payload/2,
          datetime_to_unixtime/1,
          concat_path/1,
-         
+
+         term_to_string/1,
+
          mount_point/0,
          mount_options/0,
 
@@ -84,7 +86,9 @@ term_to_string(T) when is_list(T) ->
 term_to_string(T) when is_atom(T) ->
     atom_to_list(T);
 term_to_string(T) when is_binary(T) ->
-    binary_to_list(T).
+    binary_to_list(T);
+term_to_string(T) ->
+    lists:flatten(io_lib:format("~w",[T])).
 
 decode_payload(ContentType, Payload) ->    
     case ContentType of

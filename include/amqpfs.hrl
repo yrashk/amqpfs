@@ -10,6 +10,8 @@
         {
           module,
           args = [],
+          app_id,
+          user_id,
           connection,
           channel,
           request_headers,
