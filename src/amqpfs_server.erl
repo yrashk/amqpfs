@@ -111,6 +111,7 @@ init ([]) ->
     State = #amqpfs{ inodes = ets:new(inodes, [public, ordered_set]),
                      names = ets:new(names, [public, set]),
                      announcements = ets:new(announcements, [public, bag]),
+                     providers = ets:new(providers, [public, set]),
                      response_routes = ets:new(response_routes, [public, set]),
                      response_cache = ets:new(response_cache, [public, set]),
                      response_policies = ets:new(response_policies, [public, set]),
@@ -126,9 +127,9 @@ code_change (_OldVsn, State, _Extra) -> { ok, State }.
 
 handle_info({#'basic.deliver'{consumer_tag=ConsumerTag, delivery_tag=_DeliveryTag, redelivered=_Redelivered, 
                               exchange = <<"amqpfs.response">>, routing_key=_RoutingKey}, Content}, 
-            #amqpfs{response_routes = Tab, amqp_response_consumer_tag = ConsumerTag, response_buffers = ResponseBuffers }=State) ->
+            #amqpfs{response_routes = Tab, amqp_response_consumer_tag = ConsumerTag, response_buffers = ResponseBuffers, providers = Providers }=State) ->
     #amqp_msg{payload = Payload } = Content,
-    #'P_basic'{content_type = ContentType, headers = Headers, correlation_id = Route} = Content#amqp_msg.props,
+    #'P_basic'{content_type = ContentType, headers = Headers, correlation_id = Route, user_id = UserId, app_id = AppId} = Content#amqp_msg.props,
     TTL = 
         case lists:keysearch(<<"ttl">>, 1, Headers) of
             {value, {<<"ttl">>, _, Val}} ->
@@ -137,6 +138,7 @@ handle_info({#'basic.deliver'{consumer_tag=ConsumerTag, delivery_tag=_DeliveryTa
                 0
         end,
     Response = amqpfs_util:decode_payload(ContentType, Payload),
+    ets:insert(Providers, {UserId, AppId, amqpfs_util:datetime_to_unixtime(calendar:local_time())}),
     ets:insert(ResponseBuffers, {Route, Response, TTL}),
     case ets:lookup(Tab, Route) of 
         [{Route, Pid, Path, Command}] ->
@@ -174,8 +176,9 @@ handle_info (_Msg, State) -> { noreply, State }.
 
 terminate (_Reason, _State) -> ok.
 
-handle_command({announce, directory, {Path, Contents}}, UserId, AppId, #amqpfs{ announcements = Announcements} = State) ->
+handle_command({announce, directory, {Path, Contents}}, UserId, AppId, #amqpfs{ announcements = Announcements, providers = Providers} = State) ->
     {_, State1} = make_inode(Path, {directory, Contents}, State),
+    ets:insert(Providers, {UserId, AppId, amqpfs_util:datetime_to_unixtime(calendar:local_time())}),
     ets:insert(Announcements, {Path, {directory, Contents}, UserId, AppId}),
     set_new_response_policies(Path, amqpfs_response_policies:new(), State),
     State1;

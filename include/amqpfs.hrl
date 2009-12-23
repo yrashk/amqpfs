@@ -22,6 +22,7 @@
 -record (amqpfs, { inodes, 
                    names,
                    announcements,
+                   providers,
                    response_routes,
                    response_cache,
                    response_policies,

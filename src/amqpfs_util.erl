@@ -34,6 +34,12 @@ setup(Channel) ->
                                                                               type = <<"topic">>,
                                                                               passive = false, durable = false,
                                                                               auto_delete = false, internal = false,
+                                                                              nowait = false, arguments = []}),
+    #'exchange.declare_ok'{} = amqp_channel:call(Channel, #'exchange.declare'{
+                                                                              exchange = <<"amqpfs.provider">>,
+                                                                              type = <<"direct">>,
+                                                                              passive = false, durable = false,
+                                                                              auto_delete = false, internal = false,
                                                                               nowait = false, arguments = []}).
 
 setup_provider_queue(Channel, Name) ->

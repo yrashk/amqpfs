@@ -46,6 +46,17 @@ handle_info(Msg, State) ->
     spawn(fun () -> handle_info_async(Msg, State) end),
     {noreply, State}.
 
+handle_info_async({#'basic.deliver'{consumer_tag=_ConsumerTag, delivery_tag=_DeliveryTag, redelivered=_Redelivered, exchange = <<"amqpfs.provider">>, routing_key=_RoutingKey}, Content}, State) ->
+    #amqp_msg{payload = Payload } = Content,
+    #'P_basic'{content_type = ContentType, headers = _Headers, message_id = MessageId, reply_to = ReplyTo} = Content#amqp_msg.props,
+    Command = amqpfs_util:decode_payload(ContentType, Payload),
+    case Command of
+        ping ->
+            send_response(ReplyTo, MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(pong), State);
+        _ ->
+            ignore
+    end;
+
 handle_info_async({#'basic.deliver'{consumer_tag=_ConsumerTag, delivery_tag=_DeliveryTag, redelivered=_Redelivered, exchange = <<"amqpfs">>, routing_key=_RoutingKey}, Content}, State) ->
     #amqp_msg{payload = Payload } = Content,
     #'P_basic'{content_type = ContentType, headers = Headers, message_id = MessageId, reply_to = ReplyTo} = Content#amqp_msg.props,
@@ -157,12 +168,16 @@ setup(#amqpfs_provider_state{}=State) ->
     
 
 
-setup_listener(Name, #amqpfs_provider_state{channel = Channel}=State) ->
+setup_listener(Name, #amqpfs_provider_state{channel = Channel, user_id = UserId}=State) ->
     Queue = amqpfs_util:provider_queue_name(provider_name(State)),
     #'queue.bind_ok'{} = amqp_channel:call(Channel, #'queue.bind'{
-                                                                  queue = Queue, exchange = <<"amqpfs">>,
-                                                                  routing_key = amqpfs_util:path_to_matching_routing_key(Name),
-                                                                  nowait = false, arguments = []}),
+                                             queue = Queue, exchange = <<"amqpfs">>,
+                                             routing_key = amqpfs_util:path_to_matching_routing_key(Name),
+                                             nowait = false, arguments = []}),
+    #'queue.bind_ok'{} = amqp_channel:call(Channel, #'queue.bind'{
+                                             queue = Queue, exchange = <<"amqpfs.provider">>,
+                                             routing_key = UserId,
+                                             nowait = false, arguments = []}),
     #'basic.consume_ok'{consumer_tag = ConsumerTag} = amqp_channel:subscribe(Channel, #'basic.consume'{
                                                                                                        queue = Queue,
                                                                                                        consumer_tag = <<"">>,
