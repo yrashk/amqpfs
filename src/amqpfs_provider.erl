@@ -109,7 +109,7 @@ terminate(_Reason, _State) ->
 
 send_response(ReplyTo, ContentType, Headers, Content, #amqpfs_provider_state{channel = Channel}) ->
     amqp_channel:call(Channel, #'basic.publish'{exchange = <<"amqpfs.response">>},
-                      {amqp_msg, #'P_basic'{reply_to = ReplyTo,
+                      {amqp_msg, #'P_basic'{correlation_id = ReplyTo,
                                             content_type = ContentType,
                                             headers = Headers
                                             },

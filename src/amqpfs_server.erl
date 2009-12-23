@@ -128,7 +128,7 @@ handle_info({#'basic.deliver'{consumer_tag=ConsumerTag, delivery_tag=_DeliveryTa
                               exchange = <<"amqpfs.response">>, routing_key=_RoutingKey}, Content}, 
             #amqpfs{response_routes = Tab, amqp_response_consumer_tag = ConsumerTag, response_buffers = ResponseBuffers }=State) ->
     #amqp_msg{payload = Payload } = Content,
-    #'P_basic'{content_type = ContentType, headers = Headers, reply_to = Route} = Content#amqp_msg.props,
+    #'P_basic'{content_type = ContentType, headers = Headers, correlation_id = Route} = Content#amqp_msg.props,
     TTL = 
         case lists:keysearch(<<"ttl">>, 1, Headers) of
             {value, {<<"ttl">>, _, Val}} ->
