@@ -805,10 +805,23 @@ unlink_async(Ctx, ParentIno, Name, Cont, State) ->
 %%%%%%%%%%%
 -define(HEARTBEAT_INTERVAL, 10000).
 -define(PING_THRESHOLD, 60).
+-define(RESPONSE_TIMEOUT, 10).
 
-heartbeat(#amqpfs{ amqp_channel = Channel, providers = Providers } = State) ->
+heartbeat(#amqpfs{ amqp_channel = Channel, providers = Providers, announcements = Announcements } = State) ->
     ThresholdTime = amqpfs_util:datetime_to_unixtime(calendar:local_time()) - ?PING_THRESHOLD,
-    case ets:select(Providers, [{{'$1','_','$2'}, [{'=<','$2',ThresholdTime}],['$1']}]) of
+    KillTime = amqpfs_util:datetime_to_unixtime(calendar:local_time()) - ?PING_THRESHOLD - ?RESPONSE_TIMEOUT,
+    spawn(fun () -> % launch sweeper
+                  case ets:select(Providers, [{{'$1','_','$2'}, [{'=<','$2',KillTime}],['$1']}]) of
+                      [] ->
+                          ok;
+                      SweepMatches when is_list(SweepMatches) ->
+                          lists:map(fun (UserId) ->
+                                            ets:delete(Providers, UserId),
+                                            ets:match_delete(Announcements, {'_','_',UserId,'_'})
+                                    end, SweepMatches)
+                  end
+          end),
+    case ets:select(Providers, [{{'$1','_','$2'}, [{'=<','$2',ThresholdTime},{'>','$2',KillTime}],['$1']}]) of
         [] ->
             ok;
         Matches when is_list(Matches) ->
