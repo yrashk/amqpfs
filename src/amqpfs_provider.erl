@@ -133,7 +133,7 @@ ttl(Path, State) ->
 
 announce(directory, Name, #amqpfs_provider_state{ channel = Channel } = State) ->
     setup_listener(Name, State),
-    amqpfs_announce:directory(Channel, Name).
+    amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs.announce">>}, {amqp_msg, #'P_basic'{}, term_to_binary({announce, directory, {Name,on_demand}})}).
 
 %%%% 
 
