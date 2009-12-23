@@ -51,7 +51,7 @@
 %-=====================================================================-
 
 start_link() ->
-    start_link(false, proplists:get_value(mount_point, application:get_all_env(amqpfs),"/amqpfs"), proplists:get_value(mount_options, application:get_all_env(amqpfs), "")).
+    start_link(false, amqpfs_util:mount_point(), amqpfs_util:mount_options()).
 
 start_link (LinkedIn, Dir) ->
     start_link (LinkedIn, Dir, "").
@@ -85,7 +85,7 @@ init ([]) ->
                                                                       nowait = false, arguments = []}),
     #'queue.bind_ok'{} = amqp_channel:call(AmqpChannel, #'queue.bind'{
                                                                       queue = ResponseQueue, exchange = <<"amqpfs.response">>,
-                                                                      routing_key = <<"">>,
+                                                                      routing_key = amqpfs_util:response_routing_key(),
                                                                       nowait = false, arguments = []}),
     #'basic.consume_ok'{consumer_tag = ConsumerTag} = amqp_channel:subscribe(AmqpChannel, #'basic.consume'{
                                                                                                            queue = Queue,
@@ -884,7 +884,7 @@ remote(Path, Command, Ctx, #amqpfs{response_cache = Tab}=State) ->
 remote_impl(Path, Command, Ctx, #amqpfs{amqp_channel = Channel, response_cache = Tab}=State) ->
     Route = register_response_route(Path, Command, State),
     amqp_channel:call(Channel, #'basic.publish'{exchange = <<"amqpfs">>, routing_key = amqpfs_util:path_to_routing_key(Path)}, 
-                      {amqp_msg, #'P_basic'{message_id = Route, headers = env_headers(State) ++ ctx_headers(Ctx) }, term_to_binary(Command)}),
+                      {amqp_msg, #'P_basic'{message_id = Route, reply_to = amqpfs_util:response_routing_key(), headers = env_headers(State) ++ ctx_headers(Ctx) }, term_to_binary(Command)}),
     Response = 
         receive 
             {response, Data, 0} ->

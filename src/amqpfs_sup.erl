@@ -15,9 +15,9 @@ start_link(_Args) ->
 init ([]) ->
     Inode = {amqpfs_inode, {amqpfs_inode, start_link, []},
              permanent, 3000, worker, [ amqpfs_inode ]},
-    RootAmqpfsProvider = {root_amqpfs_provider, {amqpfs_provider, start, [root_amqpfs_provider]},
+    RootAmqpfsProvider = {root_amqpfs_provider, {amqpfs_provider, start_link, [root_amqpfs_provider]},
                           permanent, 3000, worker, [ root_amqpfs_provider ]},
-    DotAmqpfsProvider = {dot_amqpfs_provider, {amqpfs_provider, start, [dot_amqpfs_provider]},
+    DotAmqpfsProvider = {dot_amqpfs_provider, {amqpfs_provider, start_link, [dot_amqpfs_provider]},
                          permanent, 3000, worker, [ dot_amqpfs_provider ]},
     Srv = {amqpfs_server, {amqpfs_server, start_link, []},
            permanent, 10000, worker, [ amqpfs_server ]},

@@ -1,8 +1,13 @@
 -module(amqpfs_util).
--export([path_to_matching_routing_key/1,path_to_routing_key/1, setup/1, setup_provider_queue/2, provider_queue_name/1, announce_queue_name/0, announce_queue_name/1, announce_queue_name/2, response_queue_name/0, response_queue_name/1,
+-export([path_to_matching_routing_key/1,path_to_routing_key/1, setup/1, setup_provider_queue/2, 
+         provider_queue_name/1, announce_queue_name/0, announce_queue_name/1, announce_queue_name/2, response_queue_name/0, response_queue_name/1,
+         response_routing_key/0,
          decode_payload/2,
          datetime_to_unixtime/1,
          concat_path/1,
+         
+         mount_point/0,
+         mount_options/0,
 
          print_banner/0
         ]).
@@ -57,7 +62,10 @@ response_queue_name(Node) ->
 
 provider_queue_name(Name) ->
     list_to_binary(term_to_string(Name) ++ ":" ++ atom_to_list(node())).
-    
+
+response_routing_key() ->    
+    list_to_binary(atom_to_list(node()) ++ ":" ++ mount_point()).
+
 
 path_to_matching_routing_key("/") ->
    <<"ROOT">>;
@@ -98,6 +106,12 @@ concat_path(["/"|_]=P) ->
 concat_path([H|T]) ->
     T1 = "/" ++ T,
     lists:flatten([H|T1]).
+
+mount_point() ->
+    filename:absname(proplists:get_value(mount_point, application:get_all_env(amqpfs),"/amqpfs")).
+
+mount_options() ->
+    proplists:get_value(mount_options, application:get_all_env(amqpfs), "").
 
 print_banner() ->
     io:format("~n
