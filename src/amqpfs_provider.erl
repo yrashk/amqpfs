@@ -167,7 +167,7 @@ setup(#amqpfs_provider_state{}=State) ->
     amqpfs_util:setup(Channel),
     amqpfs_util:setup_provider_queue(Channel, provider_name(State)),
     AppId = list_to_binary(amqpfs_util:term_to_string(provider_name(State))),
-    UserId = list_to_binary(amqpfs_util:term_to_string({node(), now()})),
+    UserId = list_to_binary(ossp_uuid:make(v1)),
     State#amqpfs_provider_state { connection = Connection, channel = Channel, app_id = AppId, user_id = UserId }.
     
 

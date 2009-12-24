@@ -894,7 +894,7 @@ path_to_announced(Path, #amqpfs{ announcements = Announcements }=State) ->
 
 
 register_response_route(Path, Command, #amqpfs{response_routes=Tab}) ->
-    Route = list_to_binary(lists:flatten(io_lib:format("~w",[now()]))),
+    Route = ossp_uuid:make_bin(v1),
     ets:insert(Tab, {Route, self(), Path, Command}),
     Route.
 

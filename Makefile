@@ -3,7 +3,12 @@ all: main
 main: submodules
 	erl -pa ebin vendor/fuserl/fuserl/src -make
 
-submodules: erabbitmq fuserl fuserldrv
+submodules: erabbitmq fuserl fuserldrv erlang-ossp-uuid
+
+erlang-ossp-uuid: $(dir vendor/erlang-ossp-uuid)
+	@cd vendor/erlang-ossp-uuid ; git submodule init
+	@cd vendor/erlang-ossp-uuid ; git submodule update
+	cd vendor/erlang-ossp-uuid ; $(MAKE)
 
 erabbitmq: rabbitmq-erlang-client
 	cd vendor/erabbitmq ; $(MAKE)
@@ -31,17 +36,13 @@ vendor/fuserl/fuserldrv/Makefile: $(dir vendor/fuserl/fuserldrv)
 	cd vendor/fuserl/fuserldrv ; ./configure
 
 run: main
-	@erl -sname fstest -pa tests ebin vendor/fuserl/fuserl/src/ vendor/erabbitmq/ebin/ vendor/rabbitmq-erlang-client/ebin/ vendor/rabbitmq-server/ebin/ -boot start_sasl -eval "application:load(fuserl)" -config configs/development -s erabbitmq -s amqpfs
+	@erl -sname fstest -pa tests ebin vendor/erlang-ossp-uuid/ebin vendor/fuserl/fuserl/src/ vendor/erabbitmq/ebin/ vendor/rabbitmq-erlang-client/ebin/ vendor/rabbitmq-server/ebin/ -boot start_sasl -eval "application:load(fuserl)" -config configs/development -s erabbitmq -s amqpfs
 
 run-simple: main
-	@erl -sname fstest -pa tests ebin vendor/fuserl/fuserl/src/ vendor/erabbitmq/ebin/ vendor/rabbitmq-erlang-client/ebin/ vendor/rabbitmq-server/ebin/ +A 32 -eval "application:load(fuserl)" -config configs/development -s erabbitmq -s amqpfs -eval "amqpfs_provider:start(simple_amqpfs_provider)"
+	@erl -sname fstest -pa tests ebin vendor/erlang-ossp-uuid/ebin vendor/fuserl/fuserl/src/ vendor/erabbitmq/ebin/ vendor/rabbitmq-erlang-client/ebin/ vendor/rabbitmq-server/ebin/ +A 32 -eval "application:load(fuserl)" -config configs/development -s erabbitmq -s amqpfs -eval "amqpfs_provider:start(simple_amqpfs_provider)"
 
 run-simple-sasl: main
-	@erl -sname fstest -pa tests ebin vendor/fuserl/fuserl/src/ vendor/erabbitmq/ebin/ vendor/rabbitmq-erlang-client/ebin/ vendor/rabbitmq-server/ebin/ -boot start_sasl +A 32 -eval "application:load(fuserl)" -config configs/development -s erabbitmq -s amqpfs -eval "amqpfs_provider:start(simple_amqpfs_provider)"
-
-
-run-mq: main
-	@erl -sname fstest -pa tests ebin vendor/fuserl/fuserl/src/ vendor/erabbitmq/ebin/ vendor/rabbitmq-erlang-client/ebin/ vendor/rabbitmq-server/ebin/ -boot start_sasl -eval "application:load(fuserl)" -config configs/development -s erabbitmq -s amqpfs -eval "amqpfs_provider:start(mq_amqpfs_provider,[{amqp_broker_node, ${NODE}}])"
+	@erl -sname fstest -pa tests ebin vendor/erlang-ossp-uuid/ebin vendor/fuserl/fuserl/src/ vendor/erabbitmq/ebin/ vendor/rabbitmq-erlang-client/ebin/ vendor/rabbitmq-server/ebin/ -boot start_sasl +A 32 -eval "application:load(fuserl)" -config configs/development -s erabbitmq -s amqpfs -eval "amqpfs_provider:start(simple_amqpfs_provider)"
 
 clean:
 	rm -rf tmp
