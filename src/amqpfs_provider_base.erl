@@ -12,6 +12,7 @@
          append/3,
          write/4, output/4, flush/3,
          readable/3, writable/3, executable/3,
+         access/3,
          uid/2, gid/2,
          mode/2,
          get_lock/4, set_lock/5,
@@ -118,13 +119,45 @@ writable(_Path, _Group, _State) ->
 executable(_Path, _Group, _State) ->
     false.
 
-uid(_Path, #amqpfs_provider_state{ request_headers = Headers }) ->
-    {value, {<<"uid">>, _, Val}} = lists:keysearch(<<"uid">>, 1, Headers),
-    Val.
+access(Path, Mask, State) ->
+    TestFunctor = fun (Permission) ->
+                          Uid = hdr(<<"uid">>, State),
+                          Gid = hdr(<<"gid">>, State),
+                          PUid = uid(Path, State),
+                          PGid = gid(Path, State),
+                          if 
+                              Uid =:= PUid ->
+                                  fun () -> amqpfs_provider:call_module(Permission, [Path, owner, State], State) end;
+                              Gid =:= PGid ->
+                                  fun () -> amqpfs_provider:call_module(Permission, [Path, group, State], State) end;
+                              true ->
+                                  fun () -> amqpfs_provider:call_module(Permission, [Path, other, State], State) end
+                          end
+                  end,
+    case 
+    lists:all(fun (X) ->
+                      X
+              end, 
+              [case Mode band Mask of
+                   0 ->
+                       true;
+                   _ -> Test()
+               end
+               || {Mode, Test} <- [{?R_OK, TestFunctor(readable)},
+                                   {?W_OK, TestFunctor(writable)},
+                                   {?X_OK, TestFunctor(executable)}]]) of
+        true ->
+            ok;
+        false ->
+            eacces
+    end.
 
-gid(_Path, #amqpfs_provider_state{ request_headers = Headers }) ->
-    {value, {<<"gid">>, _, Val}} = lists:keysearch(<<"gid">>, 1, Headers),
-    Val.
+uid(_Path, State) ->
+    hdr(<<"uid">>, State).
+
+gid(_Path, State) ->
+    hdr(<<"gid">>, State).
+
 
 get_lock(_Path, _Fi, _Lock, _State) ->
     #flock{}.
@@ -219,3 +252,7 @@ b_mode(true, N) ->
     N;
 b_mode(false, _) ->
     0.
+
+hdr(Name, #amqpfs_provider_state{request_headers = Headers} = _State) ->
+    {value, {Name, _, Val}} = lists:keysearch(Name, 1, Headers),
+    Val.

@@ -110,6 +110,8 @@ handle_info_async({#'basic.deliver'{consumer_tag=_ConsumerTag, delivery_tag=_Del
                     send_response(ReplyTo, MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(set_lock, [Path, Fi, Lock, Sleep, ReqState], ReqState)), ReqState);                
                 {flush, Path, Fi} ->
                     send_response(ReplyTo, MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(flush, [Path, Fi, ReqState], ReqState)), ReqState);                
+                {access, Path, Mask} ->
+                    send_response(ReplyTo, MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(access, [Path, Mask, ReqState], ReqState)), ReqState);                
                 _ ->
                     ignore
             end

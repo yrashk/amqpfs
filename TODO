@@ -12,7 +12,7 @@
 ** DONE getlk
 * TODO Finish incomplete implementations of these calls:
 ** DONE readlink
-** TODO access
+** DONE access
 ** DONE flush
 ** TODO forget
 ** TODO fsync/fsyncdir

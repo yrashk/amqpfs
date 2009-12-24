@@ -468,8 +468,15 @@ access(Ctx, Ino, Mask, Cont, State) ->
     spawn_link(fun () -> access_async(Ctx, Ino, Mask, Cont, State) end),
     { noreply, State }.
 
-access_async(_Ctx, _Ino, _Mask, Cont, _State) ->
-    fuserlsrv:reply(Cont, #fuse_reply_err{ err = ok }).
+access_async(Ctx, Ino, Mask, Cont, State) ->
+   Result = 
+    case ets:lookup(State#amqpfs.inodes, Ino) of
+        [{Ino, Path}] ->
+            remote(Path, {access, Path, Mask}, Ctx, State);
+        _ ->
+            enoent
+    end,
+    fuserlsrv:reply(Cont, #fuse_reply_err{ err = Result }).
 
 flush(Ctx, Ino, Fi, Cont, State) ->
     spawn_link(fun () -> flush_async(Ctx, Ino, Fi, Cont, State) end),
