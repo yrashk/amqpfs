@@ -468,12 +468,30 @@ access(Ctx, Ino, Mask, Cont, State) ->
     spawn_link(fun () -> access_async(Ctx, Ino, Mask, Cont, State) end),
     { noreply, State }.
 
-access_async(_Ctx, _Ino, _Mask, Cont, _State) ->
-    fuserlsrv:reply(Cont, #fuse_reply_err{ err = ok }).
+access_async(Ctx, Ino, Mask, Cont, State) ->
+   Result = 
+    case ets:lookup(State#amqpfs.inodes, Ino) of
+        [{Ino, Path}] ->
+            remote(Path, {access, Path, Mask}, Ctx, State);
+        _ ->
+            enoent
+    end,
+    fuserlsrv:reply(Cont, #fuse_reply_err{ err = Result }).
 
-flush (_Ctx, _Inode, _Fi, _Cont, State) ->
-  { #fuse_reply_err{ err = ok }, State }.
+flush(Ctx, Ino, Fi, Cont, State) ->
+    spawn_link(fun () -> flush_async(Ctx, Ino, Fi, Cont, State) end),
+    {noreply, State}.
 
+flush_async(Ctx, Ino, Fi, Cont, State) ->
+    Result = 
+    case ets:lookup(State#amqpfs.inodes, Ino) of
+        [{Ino, Path}] ->
+            remote(Path, {flush, Path, Fi}, Ctx, State);
+        _ ->
+            enoent
+    end,
+    fuserlsrv:reply(Cont, #fuse_reply_err{ err = Result }).
+            
 forget (_Ctx, _Inode, _Nlookup, _Cont, State) ->
   { #fuse_reply_none{}, State }.
 
@@ -883,13 +901,18 @@ remote_list_dir(Path, Ctx, State) ->
 
 remote_getattr(Path, Ctx, State) ->
     Stat0 = remote(Path, {getattr, Path}, Ctx, State),
-    case ets:lookup (State#amqpfs.names, Path) of
+    case ets:lookup(State#amqpfs.names, Path) of
         [{Path, {Ino, {directory, on_demand}}}] ->
             NLink = length(lists:filter(fun ({_Name, {Type, _}}) -> Type =:= directory end, remote_list_dir(Path, Ctx, State))) + 2, 
             % FIXME: shouldn't we assign executability if only this item is readable for particular category (owner/group/other)?
             Stat0#stat{ st_mode = ?S_IFDIR bor Stat0#stat.st_mode bor ?S_IXUSR bor ?S_IXGRP bor ?S_IXOTH, st_ino = Ino, st_nlink = NLink};
         [{Path, {Ino, {file, on_demand}}}] ->
-            Stat0#stat{ st_mode = ?S_IFREG bor Stat0#stat.st_mode, st_ino = Ino, st_nlink = 1 };
+            case (Stat0#stat.st_mode band ?S_IFMT) > 0 of
+                true -> % file type is already set
+                    Stat0#stat{ st_ino = Ino, st_nlink = 1};
+                false -> % set it to regular file
+                    Stat0#stat{ st_mode = ?S_IFREG bor Stat0#stat.st_mode, st_ino = Ino, st_nlink = 1 }
+            end;
         [{Path, {Ino, {symlink, _Contents}}}] ->
             Stat0#stat{ st_mode = ?S_IFLNK bor Stat0#stat.st_mode, st_ino = Ino, st_nlink = 1 };
         [] ->

@@ -12,8 +12,8 @@
 ** DONE getlk
 * TODO Finish incomplete implementations of these calls:
 ** DONE readlink
-** TODO access
-** TODO flush
+** DONE access
+** DONE flush
 ** TODO forget
 ** TODO fsync/fsyncdir
 ** TODO getxattr
