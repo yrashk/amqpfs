@@ -13,3 +13,6 @@
 [submodule "vendor/erabbitmq"]
 	path = vendor/erabbitmq
 	url = gitosis@git.scallable.ca:erabbitmq.git
+[submodule "vendor/erlang-ossp-uuid"]
+	path = vendor/erlang-ossp-uuid
+	url = gitosis@git.scallable.ca:erlang-ossp-uuid.git
