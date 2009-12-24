@@ -67,7 +67,7 @@ object([".amqpfs","providers","applications", _Application|Rest], State) when le
 
 object([".amqpfs", "announcements"], State) ->
     Announcements = (?AMQPFS_STATE)#amqpfs.announcements,
-    lists:flatten(string:join(ets:match(Announcements, {'$1', '_', '_', '_'}),[10]));
+    lists:flatten(string:join(lists:usort(ets:match(Announcements, {'$1', '_', '_', '_'})),[10]));
 
 object(_,_) ->
     <<>>.
