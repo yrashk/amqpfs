@@ -21,4 +21,14 @@ init ([]) ->
                          permanent, 3000, worker, [ dot_amqpfs_provider ]},
     Srv = {amqpfs_server, {amqpfs_server, start_link, []},
            permanent, 10000, worker, [ amqpfs_server ]},
-    {ok,{{one_for_one,3,10}, [Inode, Srv, RootAmqpfsProvider, DotAmqpfsProvider]}}.
+    Heartbeat = {amqpfs_hearbeat, {erlang, apply, [
+                                                   fun () -> 
+                                                           {ok, spawn_link(fun () ->
+                                                                                   amqpfs ! {deliver_state, self()},
+                                                                                   receive {amqpfs_state, State} -> State end,
+                                                                                   amqpfs_server:heartbeat(State)
+                                                                           end
+                                                                          )}
+                                                   end,[]]},
+                 permanent, 3000, worker, [amqpfs_server]},
+    {ok,{{one_for_one,3,10}, [Inode, Srv, Heartbeat, RootAmqpfsProvider, DotAmqpfsProvider]}}.
