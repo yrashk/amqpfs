@@ -11,58 +11,58 @@ init(State) ->
 
 
 create(Path, Name, _Mode, _State) ->
-    io:format("Trying to create ~s/~s~n",[Path,Name]),
+    io:format("Trying to create ~p/~s~n",[Path,Name]),
     enotsup.
 
 create_dir(Path, Name, _Mode, _State) ->
-    io:format("Trying to create directory ~s/~s~n",[Path,Name]),
+    io:format("Trying to create directory ~p/~s~n",[Path,Name]),
     enotsup.
 
-remove("/simple/" ++ File, _State) ->
+remove(["simple", File], _State) ->
     io:format("Trying to remove /simple/~s~n",[File]),
     ok.
 
 rename(Path, NewPath, _State) ->
-    io:format("Trying to rename ~s to ~s~n",[Path, NewPath]),
+    io:format("Trying to rename ~p to ~s~n",[Path, NewPath]),
     enotsup.
 
-list_dir("/simple", _State) ->
+list_dir(["simple"], _State) ->
     [{"file1", {file, on_demand}}, {"file2", {file, on_demand}},{"FILE", {symlink, "file1"}}];
 
-list_dir("/simple_on_demand", State) ->
+list_dir(["simple_on_demand"], State) ->
     {value, {_, _, Node }} = lists:keysearch(<<"node">>,1,State#amqpfs_provider_state.request_headers),
     [{"bogus",{file, on_demand}}, {binary_to_list(Node), {file, on_demand}}, {"BOGUS", {symlink, on_demand}}].
 
-readlink("/simple_on_demand/BOGUS",_State) ->
+readlink(["simple_on_demand","BOGUS"],_State) ->
     "../simple/file1".
 
-open("/simple_on_demand/bogus", _Fi, _State) ->
+open(["simple_on_demand","bogus"], _Fi, _State) ->
     ok.
 
-resize("/simple_on_demand/bogus", NewSize, _State) ->
+resize(["simple_on_demand","bogus"], NewSize, _State) ->
     io:format("Resizing to ~p~n",[NewSize]),
     NewSize.
 
 
-append("/simple_on_demand/bogus", Data, _State) ->
+append(["simple_on_demand","bogus"], Data, _State) ->
     io:format("Appending with ~p~n",[binary_to_list(Data)]),
     size(Data).
                 
-write("/simple_on_demand/bogus", Data, Offset, _State) ->
+write(["simple_on_demand","bogus"], Data, Offset, _State) ->
     io:format("Writing ~p at ~p~n",[binary_to_list(Data), Offset]),
     size(Data).
                                            
     
 -define(BOGUS_CONTENT, "This is a bogus file. Hello!" ++ [10]).
 
-object("/simple_on_demand/bogus", _State) ->
+object(["simple_on_demand","bogus"], _State) ->
     ?BOGUS_CONTENT.
 
-atime("/simple_on_demand/bogus", _State) ->
+atime(["simple_on_demand","bogus"], _State) ->
     {{2009,12,19},{18,45,35}}.
 
-mtime("/simple_on_demand/bogus", _State) ->
+mtime(["/simple_on_demand","bogus"], _State) ->
     {{2009,12,19},{18,45,37}}.
 
-ttl("/simple_on_demand/bogus"=Path, #amqpfs_provider_state{ request_command = {read, Path, _, _} }) ->
+ttl(_, #amqpfs_provider_state{ request_command = {read, "/simple_on_demand/bogus", _, _} }) ->
     3000000.

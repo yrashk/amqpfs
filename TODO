@@ -24,7 +24,7 @@
 * TODO Find the best way for newly started amqpfs daemons to get the list of directories that were announced prior to daemon launch (it could be either asking them to relist them, or... well, that's something to figure out)
 * TODO Consider making call_module to call a fallback function if 'fallback' was returned
 * TODO Consider adding erlang-ossp-uuid to the project to use UUID functionality
-* TODO Think about some generalization for the string:tokens(SomeKey, "/") case (providers), it will be very common
+* DONE Think about some generalization for the string:tokens(SomeKey, "/") case (providers), it will be very common
 * TODO Think of a better way to pass #amqpfs State to dot_amqpfs_provider
 * TODO On sweeping, remove inodes and send some error replies on pending Conts for that inodes (needs monitoring continuations)
 * TODO Consider making a special case for {rmdir, "/announced_directory"} being somehow routed to the provider that announced "/announced_directory" as well

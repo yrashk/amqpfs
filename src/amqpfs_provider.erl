@@ -68,28 +68,28 @@ handle_info_async({#'basic.deliver'{consumer_tag=_ConsumerTag, delivery_tag=_Del
         _ ->
             case Command of
                 {list_dir, Path} ->
-                    send_response(ReplyTo, MessageId, ?CONTENT_TYPE_BERT, [ttl(Path, ReqState)], term_to_binary(call_module(list_dir,[Path, ReqState], ReqState)), ReqState);
+                    send_response(ReplyTo, MessageId, ?CONTENT_TYPE_BERT, [ttl(Path, ReqState)], term_to_binary(call_module(list_dir,[tokenize_path(Path),ReqState], ReqState)), ReqState);
                 {create, Path, Name, Mode} when (Mode band ?S_IFMT) =:= ?S_IFREG ->
-                    send_response(ReplyTo, MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(create, [Path, Name, Mode, ReqState], ReqState)), ReqState);
+                    send_response(ReplyTo, MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(create, [tokenize_path(Path),Name, Mode, ReqState], ReqState)), ReqState);
                 {create, Path, Name, Mode} when (Mode band ?S_IFMT) =:= ?S_IFDIR ->
-                    send_response(ReplyTo, MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(create_dir, [Path, Name, Mode, ReqState], ReqState)), ReqState);                
+                    send_response(ReplyTo, MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(create_dir, [tokenize_path(Path),Name, Mode, ReqState], ReqState)), ReqState);                
                 {rmdir, Path} ->
-                    send_response(ReplyTo, MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(rmdir, [Path, ReqState], ReqState)), ReqState);
+                    send_response(ReplyTo, MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(rmdir, [tokenize_path(Path),ReqState], ReqState)), ReqState);
                 {remove, Path} ->
-                    send_response(ReplyTo, MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(remove, [Path, ReqState], ReqState)), ReqState);
+                    send_response(ReplyTo, MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(remove, [tokenize_path(Path),ReqState], ReqState)), ReqState);
                 {rename, Path, NewPath} ->
-                    send_response(ReplyTo, MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(rename, [Path, NewPath, ReqState], ReqState)), ReqState);
+                    send_response(ReplyTo, MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(rename, [tokenize_path(Path),NewPath, ReqState], ReqState)), ReqState);
                 {link, Path, NewPath} ->
-                    send_response(ReplyTo, MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(link, [Path, NewPath, ReqState], ReqState)), ReqState);
+                    send_response(ReplyTo, MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(link, [tokenize_path(Path),NewPath, ReqState], ReqState)), ReqState);
                 {symlink, Path, Contents} ->
-                    send_response(ReplyTo, MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(symlink, [Path, Contents, ReqState], ReqState)), ReqState);
+                    send_response(ReplyTo, MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(symlink, [tokenize_path(Path),Contents, ReqState], ReqState)), ReqState);
                 {readlink, Path} ->
-                    send_response(ReplyTo, MessageId, ?CONTENT_TYPE_BERT, [ttl(Path, ReqState)], term_to_binary(call_module(readlink, [Path, ReqState], ReqState)), ReqState);
+                    send_response(ReplyTo, MessageId, ?CONTENT_TYPE_BERT, [ttl(Path, ReqState)], term_to_binary(call_module(readlink, [tokenize_path(Path),ReqState], ReqState)), ReqState);
                 {open, Path, Fi} ->
-                    send_response(ReplyTo, MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(open, [Path, Fi, ReqState], ReqState)), ReqState);
+                    send_response(ReplyTo, MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(open, [tokenize_path(Path),Fi, ReqState], ReqState)), ReqState);
                 {read, Path, Size, Offset} ->
                     {ResultContentType, Result} = 
-                        case call_module(read, [Path, Size, Offset, ReqState], ReqState) of
+                        case call_module(read, [tokenize_path(Path),Size, Offset, ReqState], ReqState) of
                             Datum when is_binary(Datum) ->
                                 {?CONTENT_TYPE_BIN, Datum};
                             Datum ->
@@ -97,21 +97,21 @@ handle_info_async({#'basic.deliver'{consumer_tag=_ConsumerTag, delivery_tag=_Del
                         end,
                     send_response(ReplyTo, MessageId, ResultContentType, [ttl(Path, ReqState)], Result, ReqState);
                 {write, Path, Data, Offset} ->
-                    send_response(ReplyTo, MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(output, [Path, Data, Offset, ReqState], ReqState)), ReqState);
+                    send_response(ReplyTo, MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(output, [tokenize_path(Path),Data, Offset, ReqState], ReqState)), ReqState);
                 {getattr, Path} ->
-                    send_response(ReplyTo, MessageId, ?CONTENT_TYPE_BERT, [ttl(Path, ReqState)], term_to_binary(call_module(getattr, [Path, ReqState], ReqState)), ReqState);
+                    send_response(ReplyTo, MessageId, ?CONTENT_TYPE_BERT, [ttl(Path, ReqState)], term_to_binary(call_module(getattr, [tokenize_path(Path),ReqState], ReqState)), ReqState);
                 {setattr, Path, Stat, Attr, ToSet} ->
-                    send_response(ReplyTo, MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(setattr, [Path, Stat, Attr, ToSet, ReqState], ReqState)), ReqState);
+                    send_response(ReplyTo, MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(setattr, [tokenize_path(Path),Stat, Attr, ToSet, ReqState], ReqState)), ReqState);
                 {release, Path, Fi} ->
-                    send_response(ReplyTo, MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(release, [Path, Fi, ReqState], ReqState)), ReqState); 
+                    send_response(ReplyTo, MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(release, [tokenize_path(Path),Fi, ReqState], ReqState)), ReqState); 
                 {get_lock, Path, Fi, Lock} ->
-                    send_response(ReplyTo, MessageId, ?CONTENT_TYPE_BERT, [ttl(Path, ReqState)], term_to_binary(call_module(get_lock, [Path, Fi, Lock, ReqState], ReqState)), ReqState);
+                    send_response(ReplyTo, MessageId, ?CONTENT_TYPE_BERT, [ttl(Path, ReqState)], term_to_binary(call_module(get_lock, [tokenize_path(Path),Fi, Lock, ReqState], ReqState)), ReqState);
                 {set_lock, Path, Fi, Lock, Sleep} ->
-                    send_response(ReplyTo, MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(set_lock, [Path, Fi, Lock, Sleep, ReqState], ReqState)), ReqState);                
+                    send_response(ReplyTo, MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(set_lock, [tokenize_path(Path),Fi, Lock, Sleep, ReqState], ReqState)), ReqState);                
                 {flush, Path, Fi} ->
-                    send_response(ReplyTo, MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(flush, [Path, Fi, ReqState], ReqState)), ReqState);                
+                    send_response(ReplyTo, MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(flush, [tokenize_path(Path),Fi, ReqState], ReqState)), ReqState);                
                 {access, Path, Mask} ->
-                    send_response(ReplyTo, MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(access, [Path, Mask, ReqState], ReqState)), ReqState);                
+                    send_response(ReplyTo, MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(access, [tokenize_path(Path),Mask, ReqState], ReqState)), ReqState);                
                 _ ->
                     ignore
             end
@@ -139,7 +139,7 @@ send_response(ReplyTo, MessageId, ContentType, Headers, Content, #amqpfs_provide
                        Content}).
 
 ttl(Path, State) ->
-    case call_module(ttl, [Path, State], State) of
+    case call_module(ttl, [tokenize_path(Path), State], State) of
         forever ->
             {"ttl", long, -1};
         Val ->
@@ -213,3 +213,8 @@ call_module(F, A, Module) when is_atom(Module) ->
 
 provider_name(#amqpfs_provider_state{ module = Module, args = Args }) ->
     proplists:get_value(name, Args, Module).
+
+%% 
+
+tokenize_path(Path) ->
+    string:tokens(Path,"/").
