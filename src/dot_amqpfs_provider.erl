@@ -21,7 +21,7 @@ init(State) ->
     State#amqpfs_provider_state{ extra = AmqpfsState }.
 
 list_dir([".amqpfs"], _State) ->
-    [{"version", {file, on_demand}},{"providers",{directory, on_demand}}];
+    [{"version", {file, on_demand}},{"providers",{directory, on_demand}},{"announcements",{file, on_demand}}];
 
 list_dir([".amqpfs","providers"], _State) ->
     [{"instances", {directory, on_demand}},{"applications",{directory, on_demand}}];
@@ -34,7 +34,7 @@ list_dir([".amqpfs","providers","applications"], State) ->
     Providers = (?AMQPFS_STATE)#amqpfs.providers,
     lists:ukeysort(1, lists:map(fun ([Provider]) -> {binary_to_list(Provider), {directory, on_demand}} end, ets:match(Providers, {'_','$1','_'})));
 
-list_dir([".amqpfs","providers","instances"|_Provider], _State) ->
+list_dir([".amqpfs","providers","instances",_Provider], _State) ->
     [{"application", {file, on_demand}}, {"announcements", {file, on_demand}}];
 
 list_dir([".amqpfs","providers","applications",Application], State) ->
@@ -61,9 +61,13 @@ object([".amqpfs","providers","instances", Provider, "announcements"], State) ->
     Announcements = (?AMQPFS_STATE)#amqpfs.announcements,
     lists:flatten(string:join(ets:match(Announcements, {'$1', '_', list_to_binary(Provider), '_'}),[10]));
 
-
 object([".amqpfs","providers","applications", _Application|Rest], State) when length(Rest) > 0 ->
     object([".amqpfs","providers","instances"|Rest], State);
+
+
+object([".amqpfs", "announcements"], State) ->
+    Announcements = (?AMQPFS_STATE)#amqpfs.announcements,
+    lists:flatten(string:join(ets:match(Announcements, {'$1', '_', '_', '_'}),[10]));
 
 object(_,_) ->
     <<>>.
@@ -72,8 +76,6 @@ object(_,_) ->
 mtime([".amqpfs","providers","instances", Provider|_], State) ->
     Providers = (?AMQPFS_STATE)#amqpfs.providers,
     case ets:lookup(Providers, list_to_binary(Provider)) of
-        [] ->
-            "";
         [{_, _, LastUpdate}] ->
             amqpfs_util:unixtime_to_datetime(LastUpdate)
     end;
