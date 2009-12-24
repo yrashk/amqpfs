@@ -883,13 +883,18 @@ remote_list_dir(Path, Ctx, State) ->
 
 remote_getattr(Path, Ctx, State) ->
     Stat0 = remote(Path, {getattr, Path}, Ctx, State),
-    case ets:lookup (State#amqpfs.names, Path) of
+    case ets:lookup(State#amqpfs.names, Path) of
         [{Path, {Ino, {directory, on_demand}}}] ->
             NLink = length(lists:filter(fun ({_Name, {Type, _}}) -> Type =:= directory end, remote_list_dir(Path, Ctx, State))) + 2, 
             % FIXME: shouldn't we assign executability if only this item is readable for particular category (owner/group/other)?
             Stat0#stat{ st_mode = ?S_IFDIR bor Stat0#stat.st_mode bor ?S_IXUSR bor ?S_IXGRP bor ?S_IXOTH, st_ino = Ino, st_nlink = NLink};
         [{Path, {Ino, {file, on_demand}}}] ->
-            Stat0#stat{ st_mode = ?S_IFREG bor Stat0#stat.st_mode, st_ino = Ino, st_nlink = 1 };
+            case (Stat0#stat.st_mode band ?S_IFMT) > 0 of
+                true -> % file type is already set
+                    Stat0#stat{ st_ino = Ino, st_nlink = 1};
+                false -> % set it to regular file
+                    Stat0#stat{ st_mode = ?S_IFREG bor Stat0#stat.st_mode, st_ino = Ino, st_nlink = 1 }
+            end;
         [{Path, {Ino, {symlink, _Contents}}}] ->
             Stat0#stat{ st_mode = ?S_IFLNK bor Stat0#stat.st_mode, st_ino = Ino, st_nlink = 1 };
         [] ->

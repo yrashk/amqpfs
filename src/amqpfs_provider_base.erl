@@ -13,6 +13,7 @@
          write/4, output/4,
          readable/3, writable/3, executable/3,
          uid/2, gid/2,
+         mode/2,
          get_lock/4, set_lock/5,
          handle_info/2,
          ttl/2,
@@ -173,9 +174,7 @@ setattr(Path, Stat, Attr, ToSet, State) ->
                st_mtime = NewMTime }.
 
 
-mode(true, N) ->
-    N;
-mode(false, _) ->
+mode(_Path, _State) ->
     0.
 
 getattr(Path,State) ->
@@ -183,21 +182,21 @@ getattr(Path,State) ->
     ATime = amqpfs_util:datetime_to_unixtime(amqpfs_provider:call_module(atime, [Path, State], State)),
     MTime = amqpfs_util:datetime_to_unixtime(amqpfs_provider:call_module(mtime, [Path, State], State)),
     Mode =
-        (mode(readable(Path, owner, State), ?S_IRUSR) bor
-         mode(writable(Path, owner, State), ?S_IWUSR) bor
-         mode(executable(Path, owner, State), ?S_IXUSR)) bor
-        (mode(readable(Path, group, State), ?S_IRGRP) bor
-         mode(writable(Path, group, State), ?S_IWGRP) bor
-         mode(executable(Path, group, State), ?S_IXGRP)) bor
-        (mode(readable(Path, other, State), ?S_IROTH) bor
-         mode(writable(Path, other, State), ?S_IWOTH) bor
-         mode(executable(Path, other, State), ?S_IXOTH)),
+        (b_mode(readable(Path, owner, State), ?S_IRUSR) bor
+         b_mode(writable(Path, owner, State), ?S_IWUSR) bor
+         b_mode(executable(Path, owner, State), ?S_IXUSR)) bor
+        (b_mode(readable(Path, group, State), ?S_IRGRP) bor
+         b_mode(writable(Path, group, State), ?S_IWGRP) bor
+         b_mode(executable(Path, group, State), ?S_IXGRP)) bor
+        (b_mode(readable(Path, other, State), ?S_IROTH) bor
+         b_mode(writable(Path, other, State), ?S_IWOTH) bor
+         b_mode(executable(Path, other, State), ?S_IXOTH)),
     UID = amqpfs_provider:call_module(uid, [Path, State], State),
     GID = amqpfs_provider:call_module(gid, [Path, State], State),
     #stat{ st_atime = ATime,
            st_mtime = MTime,
            st_size = Size,
-           st_mode = Mode,
+           st_mode = Mode bor amqpfs_provider:call_module(mode, [Path, State], State),
            st_uid = UID,
            st_gid = GID
          }.
@@ -210,3 +209,10 @@ ttl(_Path, _State) ->
 
 allow_request(_State) ->
     true.
+
+%
+
+b_mode(true, N) ->
+    N;
+b_mode(false, _) ->
+    0.
