@@ -37,7 +37,7 @@ init(#amqpfs_provider_state{ channel = Channel }=State) ->
     amqpfs_provider:announce(directory, "/", State1),
     State1.
 
-list_dir("/", #amqpfs_provider_state{ extra = Extra }) ->
+list_dir([], #amqpfs_provider_state{ extra = Extra }) ->
     Items = Extra#root_amqpfs_provider_extra.items,
     ets:tab2list(Items).
     
