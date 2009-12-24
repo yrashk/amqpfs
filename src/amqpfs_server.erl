@@ -168,6 +168,11 @@ handle_info({#'basic.deliver'{consumer_tag=ConsumerTag, delivery_tag=_DeliveryTa
     Command = amqpfs_util:decode_payload(ContentType, Payload),
     {noreply, handle_command(Command, UserId, AppId, State)};
 
+
+handle_info({deliver_state, Pid}, State) ->
+    Pid ! {amqpfs_state, State},
+    {noreply, State};
+
 handle_info({set_response_policies, Path, Policies}, State) ->
     set_response_policies(Path, Policies, State),
     {noreply, State};
