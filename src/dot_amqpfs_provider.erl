@@ -34,7 +34,7 @@ list_dir([".amqpfs","providers","applications"], State) ->
     Providers = (?AMQPFS_STATE)#amqpfs.providers,
     lists:ukeysort(1, lists:map(fun ([Provider]) -> {binary_to_list(Provider), {directory, on_demand}} end, ets:match(Providers, {'_','$1','_'})));
 
-list_dir([".amqpfs","providers","instances"|_Provider], _State) ->
+list_dir([".amqpfs","providers","instances",_Provider], _State) ->
     [{"application", {file, on_demand}}, {"announcements", {file, on_demand}}];
 
 list_dir([".amqpfs","providers","applications",Application], State) ->
