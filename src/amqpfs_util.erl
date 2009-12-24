@@ -4,6 +4,7 @@
          response_routing_key/0,
          decode_payload/2,
          datetime_to_unixtime/1,
+         unixtime_to_datetime/1,
          concat_path/1,
 
          term_to_string/1,
@@ -110,6 +111,9 @@ decode_payload(ContentType, Payload) ->
 
 datetime_to_unixtime(DateTime) ->
     calendar:datetime_to_gregorian_seconds(DateTime)-calendar:datetime_to_gregorian_seconds(?EPOCH_START).
+
+unixtime_to_datetime(UnixTime) ->
+    calendar:gregorian_seconds_to_datetime(UnixTime+calendar:datetime_to_gregorian_seconds(?EPOCH_START)).
 
 concat_path(["/"|_]=P) ->
     lists:concat(P);
