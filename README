@@ -23,8 +23,6 @@ Requirements
 Build instructions
 ==================
 
-$ git submodule init
-$ git submodule update
 $ mkdir ./amqpfs # (for default mount point)
 $ make
 $ make rabbit # (in a separate terminal/screen session, as it starts RabbitMQ not as a daemon)
