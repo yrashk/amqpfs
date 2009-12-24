@@ -72,8 +72,6 @@ object(_,_) ->
 mtime([".amqpfs","providers","instances", Provider|_], State) ->
     Providers = (?AMQPFS_STATE)#amqpfs.providers,
     case ets:lookup(Providers, list_to_binary(Provider)) of
-        [] ->
-            "";
         [{_, _, LastUpdate}] ->
             amqpfs_util:unixtime_to_datetime(LastUpdate)
     end;
