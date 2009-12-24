@@ -10,7 +10,7 @@
          object/2, size/2, resize/3,
          atime/2, mtime/2,
          append/3,
-         write/4, output/4,
+         write/4, output/4, flush/3,
          readable/3, writable/3, executable/3,
          uid/2, gid/2,
          mode/2,
@@ -88,6 +88,9 @@ output(Path, Data, Offset, State) ->
        true -> 
             amqpfs_provider:call_module(write, [Path, Data, Offset, State], State)
     end.
+
+flush(_Path, _Fi, _State) ->
+    ok.
 
 object(_Path, _State) ->
     <<>>.
