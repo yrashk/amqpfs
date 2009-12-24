@@ -42,7 +42,7 @@ Platforms Compatibilities
 Examples
 ========
 
-For examples, take a look at src/amqpfs_provider_base.erl, src/root_amqpfs_provider.erl, src/dot_amqpfs_provider.erl, src/mq_amqpfs_provider and tests/simple_amqpfs_provider.erl
+For examples, take a look at src/amqpfs_provider_base.erl, src/root_amqpfs_provider.erl, src/dot_amqpfs_provider.erl and tests/simple_amqpfs_provider.erl
 
 Also, you can find some intro example on how to change response collection and reducing policies at https://gist.github.com/98fadf2f777b178ffbf0
 
