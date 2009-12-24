@@ -20,7 +20,7 @@ vendor/rabbitmq-erlang-client/dist/amqp_client.ez: $(dir vendor/rabbitmq-erlang-
 	cd vendor/rabbitmq-server ; $(MAKE)
 	cd vendor/rabbitmq-erlang-client ; $(MAKE)
 
-fuserl: vendor/fuserl/fuserl/Makefile
+fuserl: vendor/fuserl/fuserl/Makefile $(dir vendor/fuserl/fuserl/src)
 	cd vendor/fuserl/fuserl ; $(MAKE)
 
 vendor/fuserl/fuserl/Makefile: $(dir vendor/fuserl/fuserl)
