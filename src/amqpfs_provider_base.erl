@@ -218,15 +218,15 @@ getattr(Path,State) ->
     ATime = amqpfs_util:datetime_to_unixtime(amqpfs_provider:call_module(atime, [Path, State], State)),
     MTime = amqpfs_util:datetime_to_unixtime(amqpfs_provider:call_module(mtime, [Path, State], State)),
     Mode =
-        (b_mode(readable(Path, owner, State), ?S_IRUSR) bor
-         b_mode(writable(Path, owner, State), ?S_IWUSR) bor
-         b_mode(executable(Path, owner, State), ?S_IXUSR)) bor
-        (b_mode(readable(Path, group, State), ?S_IRGRP) bor
-         b_mode(writable(Path, group, State), ?S_IWGRP) bor
-         b_mode(executable(Path, group, State), ?S_IXGRP)) bor
-        (b_mode(readable(Path, other, State), ?S_IROTH) bor
-         b_mode(writable(Path, other, State), ?S_IWOTH) bor
-         b_mode(executable(Path, other, State), ?S_IXOTH)),
+        (b_mode(amqpfs_provider:call_module(readable, [Path, owner, State], State), ?S_IRUSR) bor
+         b_mode(amqpfs_provider:call_module(writable, [Path, owner, State], State), ?S_IWUSR) bor
+         b_mode(amqpfs_provider:call_module(executable, [Path, owner, State], State), ?S_IXUSR)) bor
+        (b_mode(amqpfs_provider:call_module(readable, [Path, group, State], State), ?S_IRGRP) bor
+         b_mode(amqpfs_provider:call_module(writable, [Path, group, State], State), ?S_IWGRP) bor
+         b_mode(amqpfs_provider:call_module(executable, [Path, group, State], State), ?S_IXGRP)) bor
+        (b_mode(amqpfs_provider:call_module(readable, [Path, other, State], State), ?S_IROTH) bor
+         b_mode(amqpfs_provider:call_module(writable, [Path, other, State], State), ?S_IWOTH) bor
+         b_mode(amqpfs_provider:call_module(executable, [Path, other, State], State), ?S_IXOTH)),
     UID = amqpfs_provider:call_module(uid, [Path, State], State),
     GID = amqpfs_provider:call_module(gid, [Path, State], State),
     #stat{ st_atime = ATime,
