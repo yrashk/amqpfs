@@ -6,6 +6,7 @@
            init/1,
            set_response_policies/2,
            path_to_announced/2,
+           heartbeat/1,
            terminate/2,
            getattr/4,
            lookup/5,
@@ -121,7 +122,6 @@ init ([]) ->
                      amqp_consumer_tag = ConsumerTag,
                      amqp_response_consumer_tag = ResponseConsumerTag
                   },
-    spawn_link(fun () -> heartbeat(State) end),
     { ok, State }.
 
 code_change (_OldVsn, State, _Extra) -> { ok, State }.

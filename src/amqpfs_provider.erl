@@ -164,16 +164,17 @@ setup(#amqpfs_provider_state{}=State) ->
                                                                 ssl_options = proplists:get_value(ssl_options, Credentials, none)
                                                                }),
     {ok, Channel} = erabbitmq_channels:open(Connection),
-    amqpfs_util:setup(Channel),
-    amqpfs_util:setup_provider_queue(Channel, provider_name(State)),
     AppId = list_to_binary(amqpfs_util:term_to_string(provider_name(State))),
     UserId = list_to_binary(ossp_uuid:make(v1)),
-    State#amqpfs_provider_state { connection = Connection, channel = Channel, app_id = AppId, user_id = UserId }.
+    State1 = State#amqpfs_provider_state { connection = Connection, channel = Channel, app_id = AppId, user_id = UserId },
+    amqpfs_util:setup(Channel),
+    amqpfs_util:setup_provider_queue(Channel, bind_to(State1)),
+    State1.
     
 
 
 setup_listener(Name, #amqpfs_provider_state{channel = Channel, user_id = UserId}=State) ->
-    Queue = amqpfs_util:provider_queue_name(provider_name(State)),
+    Queue = amqpfs_util:provider_queue_name(bind_to(State)),
     #'queue.bind_ok'{} = amqp_channel:call(Channel, #'queue.bind'{
                                              queue = Queue, exchange = <<"amqpfs">>,
                                              routing_key = amqpfs_util:path_to_matching_routing_key(Name),
@@ -213,6 +214,14 @@ call_module(F, A, Module) when is_atom(Module) ->
 
 provider_name(#amqpfs_provider_state{ module = Module, args = Args }) ->
     proplists:get_value(name, Args, Module).
+
+bind_to(#amqpfs_provider_state{ args = Args, user_id = UserId }=State) ->
+    case proplists:get_value(bind_to, Args, provider_name(State)) of
+        instance_id ->
+            UserId;
+        Other ->
+            Other
+    end.
 
 %% 
 
