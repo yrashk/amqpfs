@@ -3,7 +3,11 @@ all: main
 main: submodules
 	erl -pa ebin vendor/fuserl/fuserl/src -make
 
-submodules: erabbitmq fuserl fuserldrv erlang-ossp-uuid
+submodules: init-submodules erabbitmq fuserl fuserldrv erlang-ossp-uuid
+
+init-submodules:
+	@git submodule init
+	@git submodule update
 
 erlang-ossp-uuid: $(dir vendor/erlang-ossp-uuid)
 	@cd vendor/erlang-ossp-uuid ; git submodule init
