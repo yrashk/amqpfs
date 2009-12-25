@@ -489,7 +489,18 @@ access_async(Ctx, Ino, Mask, Cont, State) ->
    Result = 
     case ets:lookup(State#amqpfs.inodes, Ino) of
         [{Ino, Path}] ->
-            remote(Path, {access, Path, Mask}, Ctx, State);
+            case ets:lookup(State#amqpfs.names, Path) of
+                [{Path, {Ino, {Type, _}}}] ->
+                    Type
+            end,
+            case Type of 
+                file ->
+                    remote(Path, {access, Path, Mask}, Ctx, State);
+                symlink ->
+                    remote(Path, {access, Path, Mask}, Ctx, State);
+                directory ->
+                    remote(Path, {access, directory, Path, Mask}, Ctx, State)
+            end;
         _ ->
             enoent
     end,

@@ -112,6 +112,8 @@ handle_info_async({#'basic.deliver'{consumer_tag=_ConsumerTag, delivery_tag=_Del
                     send_response(ReplyTo, MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(flush, [tokenize_path(Path),Fi, ReqState], ReqState)), ReqState);                
                 {access, Path, Mask} ->
                     send_response(ReplyTo, MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(access, [tokenize_path(Path),Mask, ReqState], ReqState)), ReqState);                
+                {access, directory, Path, Mask} ->
+                    send_response(ReplyTo, MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(access_dir, [tokenize_path(Path),Mask, ReqState], ReqState)), ReqState);                
                 _ ->
                     ignore
             end
