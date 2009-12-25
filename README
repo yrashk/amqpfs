@@ -18,7 +18,7 @@ Requirements
 * Erlang R13B03
 * make
 * gcc
-* fuse (or macfuse on Mac OS X)
+* fuse (libfuse-devel on Linux or macfuse on Mac OS X)
 
 Build instructions
 ==================
