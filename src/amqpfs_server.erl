@@ -113,6 +113,7 @@ init ([]) ->
                      names = ets:new(names, [public, set]),
                      announcements = ets:new(announcements, [public, bag]),
                      providers = ets:new(providers, [public, set]),
+                     fuse_continuations = ets:new(fuse_continuations, [public, bag]),
                      response_routes = ets:new(response_routes, [public, set]),
                      response_cache = ets:new(response_cache, [public, set]),
                      response_policies = ets:new(response_policies, [public, set]),
@@ -233,9 +234,12 @@ normalize_reduce_function({Module, Fun}) when is_atom(Module) andalso is_atom(Fu
 normalize_reduce_function({Module, Fun, Args}) when is_atom(Module) andalso is_atom(Fun) andalso is_list(Args) ->
     {Module, Fun, Args}.
 
+%%%%%%%%%%%%%%%%%%
 
 getattr(Ctx, Ino, Cont, State) ->
-    spawn_link(fun () -> getattr_async(Ctx,
+    spawn_link(fun () -> 
+                       register_cont(Cont, Ino, State),
+                       getattr_async(Ctx,
                                        Ino,
                                        Cont,
                                        State)
@@ -259,12 +263,14 @@ getattr_async(Ctx, Ino, Cont, State) ->
         _ ->
             #fuse_reply_err{ err = enoent }
     end,
-    fuserlsrv:reply (Cont, Result).
+    cont_reply (Cont, Result, State).
 
 
 
 lookup(Ctx, ParentIno, BinPath, Cont, State) ->
-    spawn_link(fun () -> lookup_async(Ctx,
+    spawn_link(fun () -> 
+                       register_cont(Cont, ParentIno, State),
+                       lookup_async(Ctx,
                                       ParentIno,
                                       BinPath,
                                       Cont,
@@ -287,9 +293,9 @@ lookup_async(Ctx, ParentIno, BinPath, Cont, State) ->
                 _ ->
                     #fuse_reply_err{ err = enoent }
             end,
-            fuserlsrv:reply (Cont, Result);
+            cont_reply (Cont, Result, State);
         _ ->
-            fuserlsrv:reply (Cont, #fuse_reply_err{ err = enoent })
+            cont_reply (Cont, #fuse_reply_err{ err = enoent }, State)
     end.
 
 lookup_impl(BinPath, Path, List, Ctx, State) ->
@@ -314,11 +320,11 @@ lookup_impl(BinPath, Path, List, Ctx, State) ->
 
 
 open(Ctx, Ino, Fi, Cont, State) ->
-    spawn_link(fun () -> open_async(Ctx, Ino, Fi, Cont, State) end),
+    spawn_link(fun () -> register_cont(Cont, Ino, State), open_async(Ctx, Ino, Fi, Cont, State) end),
     { noreply, State }.
 
 opendir(Ctx, Ino, Fi, Cont, State) ->
-    spawn_link (fun () -> open_async(Ctx, Ino, Fi, Cont, State) end),
+    spawn_link (fun () -> register_cont(Cont, Ino, State), open_async(Ctx, Ino, Fi, Cont, State) end),
     { noreply, State }.
 
 open_async(Ctx, Ino, Fi, Cont, State) ->
@@ -334,10 +340,12 @@ open_async(Ctx, Ino, Fi, Cont, State) ->
         _ ->
             #fuse_reply_err{ err = enoent }
     end,
-    fuserlsrv:reply(Cont, Result).
+    cont_reply(Cont, Result, State).
 
 read(Ctx, Ino, Size, Offset, Fi, Cont, State) ->
-    spawn_link(fun () -> read_async(Ctx,
+    spawn_link(fun () -> 
+                       register_cont(Cont, Ino, State),
+                       read_async(Ctx,
                                     Ino,
                                     Size,
                                     Offset,
@@ -360,16 +368,18 @@ read_async(Ctx, Ino, Size, Offset, _Fi, Cont, State) ->
         _ ->
             #fuse_reply_err{ err = enoent }
     end,
-    fuserlsrv:reply(Cont, Result).
+    cont_reply(Cont, Result, State).
 
 readdir(Ctx, Ino, Size, Offset, Fi, Cont, State) ->
-    spawn_link(fun () -> readdir_async (Ctx,
-                                        Ino,
-                                        Size,
-                                        Offset,
-                                        Fi,
-                                        Cont,
-                                        State)
+    spawn_link(fun () -> 
+                       register_cont(Cont, Ino, State),
+                       readdir_async(Ctx,
+                                     Ino,
+                                     Size,
+                                     Offset,
+                                     Fi,
+                                     Cont,
+                                     State)
                end),
     { noreply, State }.
 
@@ -413,10 +423,10 @@ readdir_async(Ctx, Ino, Size, Offset, _Fi, Cont, #amqpfs{}=State) ->
             [ #direntry{ name = ".", offset = 1, stat = remote_getattr(Path, Ctx, State) },
               #direntry{ name = "..", offset = 2, stat = remote_getattr(filename:dirname(Path), Ctx, State) }
              ] ++ Contents)),
-    fuserlsrv:reply (Cont, #fuse_reply_direntrylist{ direntrylist = DirEntryList }).
+    cont_reply (Cont, #fuse_reply_direntrylist{ direntrylist = DirEntryList }, State).
 
 readlink(Ctx, Ino, Cont, State) ->
-    spawn_link(fun () -> readlink_async(Ctx, Ino, Cont, State) end),
+    spawn_link(fun () -> register_cont(Cont, Ino, State), readlink_async(Ctx, Ino, Cont, State) end),
     {noreply, State}.
 
 readlink_async(Ctx, Ino, Cont, State) ->
@@ -439,11 +449,13 @@ readlink_async(Ctx, Ino, Cont, State) ->
         _ ->
             #fuse_reply_err{ err = enoent }
     end,
-    fuserlsrv:reply(Cont, Result).
+    cont_reply(Cont, Result, State).
 
 
 write(Ctx, Ino, Data, Offset, Fi, Cont, State) ->
-    spawn_link(fun () -> write_async(Ctx,
+    spawn_link(fun () -> 
+                       register_cont(Cont, Ino, State),
+                       write_async(Ctx,
                                      Ino,
                                      Data,
                                      Offset,
@@ -466,25 +478,36 @@ write_async(Ctx, Ino, Data, Offset, _Fi, Cont, State) ->
         _ ->
             #fuse_reply_err{ err = enoent }
     end,
-    fuserlsrv:reply(Cont, Result).
+    cont_reply(Cont, Result, State).
     
 
 access(Ctx, Ino, Mask, Cont, State) ->
-    spawn_link(fun () -> access_async(Ctx, Ino, Mask, Cont, State) end),
+    spawn_link(fun () -> register_cont(Cont, Ino, State), access_async(Ctx, Ino, Mask, Cont, State) end),
     { noreply, State }.
 
 access_async(Ctx, Ino, Mask, Cont, State) ->
    Result = 
     case ets:lookup(State#amqpfs.inodes, Ino) of
         [{Ino, Path}] ->
-            remote(Path, {access, Path, Mask}, Ctx, State);
+            case ets:lookup(State#amqpfs.names, Path) of
+                [{Path, {Ino, {Type, _}}}] ->
+                    Type
+            end,
+            case Type of 
+                file ->
+                    remote(Path, {access, Path, Mask}, Ctx, State);
+                symlink ->
+                    remote(Path, {access, Path, Mask}, Ctx, State);
+                directory ->
+                    remote(Path, {access, directory, Path, Mask}, Ctx, State)
+            end;
         _ ->
             enoent
     end,
-    fuserlsrv:reply(Cont, #fuse_reply_err{ err = Result }).
+    cont_reply(Cont, #fuse_reply_err{ err = Result }, State).
 
 flush(Ctx, Ino, Fi, Cont, State) ->
-    spawn_link(fun () -> flush_async(Ctx, Ino, Fi, Cont, State) end),
+    spawn_link(fun () -> register_cont(Cont, Ino, State), flush_async(Ctx, Ino, Fi, Cont, State) end),
     {noreply, State}.
 
 flush_async(Ctx, Ino, Fi, Cont, State) ->
@@ -495,7 +518,7 @@ flush_async(Ctx, Ino, Fi, Cont, State) ->
         _ ->
             enoent
     end,
-    fuserlsrv:reply(Cont, #fuse_reply_err{ err = Result }).
+    cont_reply(Cont, #fuse_reply_err{ err = Result }, State).
             
 forget (_Ctx, _Inode, _Nlookup, _Cont, State) ->
   { #fuse_reply_none{}, State }.
@@ -507,7 +530,9 @@ fsyncdir (_Ctx, _Inode, _IsDataSync, _Fi, _Cont, State) ->
   { #fuse_reply_err{ err = ok }, State }.
 
 getxattr(Ctx, Ino, Name, Size, Cont, State) ->
-    spawn_link(fun () -> getxattr_async(Ctx,
+    spawn_link(fun () ->
+                       register_cont(Cont, Ino, State),
+                       getxattr_async(Ctx,
                                         Ino,
                                         Name,
                                         Size,
@@ -516,56 +541,57 @@ getxattr(Ctx, Ino, Name, Size, Cont, State) ->
                end),
     { noreply, State }.
 
-getxattr_async(_Ctx, _Ino, _Name, _Size, Cont, _State) ->
-    fuserlsrv:reply(Cont, #fuse_reply_err{ err = enotsup }).
+getxattr_async(_Ctx, _Ino, _Name, _Size, Cont, State) ->
+    cont_reply(Cont, #fuse_reply_err{ err = enotsup }, State).
 
 listxattr(Ctx, Ino, Size, Cont, State) ->
-  spawn_link(fun () -> listxattr_async(Ctx, Ino, Size, Cont, State) end),
+  spawn_link(fun () -> register_cont(Cont, Ino, State), listxattr_async(Ctx, Ino, Size, Cont, State) end),
   { noreply, State }.
 
-listxattr_async(_Ctx, _Ino, _Size, Cont, _State) ->
-    fuserlsrv:reply(Cont, #fuse_reply_err{ err = erange }).
+listxattr_async(_Ctx, _Ino, _Size, Cont, State) ->
+    cont_reply(Cont, #fuse_reply_err{ err = erange }, State).
 
 link(Ctx, Ino, NewParentIno, NewName, Cont, State) ->
-    spawn_link(fun () -> link_async(Ctx, Ino, NewParentIno, NewName, Cont, State) end),
+    spawn_link(fun () -> register_cont(Cont, Ino, State), register_cont(Cont, NewParentIno, State), link_async(Ctx, Ino, NewParentIno, NewName, Cont, State) end),
     {noreply, State}.
 
 link_async(Ctx, Ino, NewParentIno, NewName, Cont, State) ->
-   Result =
-    case ets:lookup(State#amqpfs.inodes, Ino) of
-        [{Ino,Path}] ->
-            case ets:lookup(State#amqpfs.inodes, NewParentIno) of
-                [{NewParentIno,NewPath}] ->
-                    NewFullPath = amqpfs_util:concat_path([NewPath,binary_to_list(NewName)]),
-                    Extra = case ets:lookup(State#amqpfs.names, Path) of
-                                [{Path, {_,Type}}] ->
-                                    Type;
-                                _ ->
-                                    {file, on_demand} % but this should never happen, I guess
-                            end,
-                    case remote(Path, {link, Path, NewFullPath}, Ctx, State) of
-                        ok ->
-                            {NewIno, _ } = make_inode(NewFullPath, Extra, State),
-                            Stat = remote_getattr(NewFullPath, Ctx, State),
-                            #fuse_reply_entry{ 
-                                               fuse_entry_param = #fuse_entry_param{ ino = NewIno,
-                                                                                     generation = 1,  
-                                                                                     attr_timeout_ms = 1000,
-                                                                                     entry_timeout_ms = 1000,
+    Result =
+        case ets:lookup(State#amqpfs.inodes, Ino) of
+            [{Ino,Path}] ->
+                case ets:lookup(State#amqpfs.inodes, NewParentIno) of
+                    [{NewParentIno,NewPath}] ->
+                        NewFullPath = amqpfs_util:concat_path([NewPath,binary_to_list(NewName)]),
+                        Extra = case ets:lookup(State#amqpfs.names, Path) of
+                                    [{Path, {_,Type}}] ->
+                                        Type;
+                                    _ ->
+                                        {file, on_demand} % but this should never happen, I guess
+                                end,
+                        case remote(Path, {link, Path, NewFullPath}, Ctx, State) of
+                            ok ->
+                                {NewIno, _ } = make_inode(NewFullPath, Extra, State),
+                                Stat = remote_getattr(NewFullPath, Ctx, State),
+                                #fuse_reply_entry{ 
+                                                   fuse_entry_param = #fuse_entry_param{ ino = NewIno,
+                                                                                         generation = 1,  
+                                                                                         attr_timeout_ms = 1000,
+                                                                                         entry_timeout_ms = 1000,
                                                                                      attr = Stat } };
-                        Err ->
-                            #fuse_reply_err{ err = Err }
-                    end;
-                _ ->
-                    #fuse_reply_err{ err = enoent }
-            end;
-        _ ->
-            #fuse_reply_err{ err = enoent }
-    end,
-    fuserlsrv:reply (Cont, Result).
-                              
+                            Err ->
+                                #fuse_reply_err{ err = Err }
+                        end;
+                    _ ->
+                        #fuse_reply_err{ err = enoent }
+                end;
+            _ ->
+                #fuse_reply_err{ err = enoent }
+        end,
+    cont_reply(Cont, Result, State).
+    
+                          
 symlink(Ctx, Link, Ino, Name, Cont, State) ->
-    spawn_link(fun() -> symlink_async(Ctx, Link, Ino, Name, Cont, State) end).
+    spawn_link(fun() -> register_cont(Cont, Ino, State), symlink_async(Ctx, Link, Ino, Name, Cont, State) end).
 
 symlink_async(Ctx, Link, Ino, Name, Cont, State) ->
    Result =
@@ -589,7 +615,7 @@ symlink_async(Ctx, Link, Ino, Name, Cont, State) ->
         _ ->
             #fuse_reply_err{ err = enoent }
     end,
-   fuserlsrv:reply (Cont, Result).
+   cont_reply(Cont, Result, State).
 
                         
                         
@@ -597,6 +623,7 @@ symlink_async(Ctx, Link, Ino, Name, Cont, State) ->
 mknod(Ctx, ParentIno, Name, Mode, Dev, Cont, State) ->
     spawn_link 
       (fun () -> 
+               register_cont(Cont, ParentIno, State),
                mknod_async(Ctx, ParentIno, Name, Mode, Dev, Cont, State) 
        end),
     {noreply, State}.
@@ -632,12 +659,13 @@ mknod_async(Ctx, ParentIno, Name, Mode, _Dev, Cont, State) ->
         _ ->
             #fuse_reply_err{ err = enoent }
     end,
-    fuserlsrv:reply(Cont, Result).   
+    cont_reply(Cont, Result, State).   
 
 
 create(Ctx, ParentIno, Name, Mode, Fi, Cont, State) ->
     spawn_link 
       (fun () -> 
+               register_cont(Cont, ParentIno, State),
                create_async(Ctx, ParentIno, Name, Mode, Fi, Cont, State)
        end),
     { noreply, State }.
@@ -669,11 +697,12 @@ create_async(Ctx, ParentIno, Name, Mode, Fi, Cont, State) ->
         _ ->
             #fuse_reply_err{ err = enoent }
     end,
-    fuserlsrv:reply(Cont, Result).   
+    cont_reply(Cont, Result, State).   
 
 release(Ctx, Ino, Fi, Cont, State) ->
     spawn_link 
       (fun () -> 
+               register_cont(Cont, Ino, State),
                release_async(Ctx, Ino, Fi, Cont, State)
        end),
     { noreply, State }.
@@ -691,13 +720,13 @@ release_async(Ctx, Ino, Fi, Cont, State) ->
             _ ->
             #fuse_reply_err{ err = enoent }
         end,
-    fuserlsrv:reply(Cont, Result).
+    cont_reply(Cont, Result, State).
 
 releasedir(_Ctx, _Ino, _Fi, _Cont, State) ->
   { #fuse_reply_err{ err = ok }, State }.
 
 getlk(Ctx, Ino, Fi, Lock, Cont, State) ->
-    spawn_link(fun () -> getlk_async(Ctx, Ino, Fi, Lock, Cont, State) end),
+    spawn_link(fun () -> register_cont(Cont, Ino, State), getlk_async(Ctx, Ino, Fi, Lock, Cont, State) end),
     {noreply, State}.
 
 getlk_async(Ctx, Ino, Fi, Lock, Cont, State) ->
@@ -713,7 +742,7 @@ getlk_async(Ctx, Ino, Fi, Lock, Cont, State) ->
         _ ->
                 #fuse_reply_err{ err = enoent }
         end,
-    fuserlsrv:reply (Cont, Result).
+    cont_reply(Cont, Result, State).
 
 mkdir(Ctx, ParentIno, Name, Mode, Cont, State) ->
     mknod(Ctx, ParentIno, Name, Mode bor ?S_IFDIR, {0,0}, Cont, State).
@@ -724,7 +753,7 @@ mkdir(Ctx, ParentIno, Name, Mode, Cont, State) ->
 %%     erlang:throw(not_implemented).
 
 rename(Ctx, ParentIno, Name, NewParentIno, NewName, Cont, State) ->
-    spawn_link(fun () -> rename_async(Ctx, ParentIno, Name, NewParentIno, NewName, Cont, State) end),
+    spawn_link(fun () -> register_cont(Cont, ParentIno, State), register_cont(Cont, NewParentIno, State), rename_async(Ctx, ParentIno, Name, NewParentIno, NewName, Cont, State) end),
     {noreply, State}.
 
 rename_async(Ctx, ParentIno, Name, NewParentIno, NewName, Cont, State) ->
@@ -742,13 +771,13 @@ rename_async(Ctx, ParentIno, Name, NewParentIno, NewName, Cont, State) ->
         _ ->
             enoent
     end,
-    fuserlsrv:reply (Cont, #fuse_reply_err{ err = Result }).
+    cont_reply(Cont, #fuse_reply_err{ err = Result }, State).
 
                         
 
 
 rmdir(Ctx, ParentIno, Name, Cont, State) ->
-    spawn_link(fun () -> rmdir_async(Ctx, ParentIno, Name, Cont, State) end),
+    spawn_link(fun () -> register_cont(Cont, ParentIno, State), rmdir_async(Ctx, ParentIno, Name, Cont, State) end),
     { noreply, State }.
 
 rmdir_async(Ctx, ParentIno, Name, Cont, State) ->
@@ -760,11 +789,11 @@ rmdir_async(Ctx, ParentIno, Name, Cont, State) ->
         _ ->
             enoent
     end,
-    fuserlsrv:reply (Cont, #fuse_reply_err{ err = Result }).
+    cont_reply(Cont, #fuse_reply_err{ err = Result }, State).
             
 
 setattr(Ctx, Ino, Attr, ToSet, Fi, Cont, State) ->
-    spawn_link(fun () -> setattr_async(Ctx, Ino, Attr, ToSet, Fi, Cont, State) end),
+    spawn_link(fun () -> register_cont(Cont, Ino, State), setattr_async(Ctx, Ino, Attr, ToSet, Fi, Cont, State) end),
     { noreply, State }.
 
 setattr_async(Ctx, Ino, Attr, ToSet, _Fi, Cont, State) ->
@@ -780,12 +809,12 @@ setattr_async(Ctx, Ino, Attr, ToSet, _Fi, Cont, State) ->
         [] ->
             #fuse_reply_err { err = enoent}
     end,
-    fuserlsrv:reply (Cont, Result).
+    cont_reply(Cont, Result, State).
 
 
 
 setlk(Ctx, Ino, Fi, Lock, Sleep, Cont, State) ->
-    spawn_link(fun () -> setlk_async(Ctx, Ino, Fi, Lock, Sleep, Cont, State) end),
+    spawn_link(fun () -> register_cont(Cont, Ino, State), setlk_async(Ctx, Ino, Fi, Lock, Sleep, Cont, State) end),
     {noreply, State}.
 
 setlk_async(Ctx, Ino, Fi, Lock, Sleep, Cont, State) ->
@@ -799,7 +828,7 @@ setlk_async(Ctx, Ino, Fi, Lock, Sleep, Cont, State) ->
         _ ->
                 #fuse_reply_err{ err = enoent }
         end,
-    fuserlsrv:reply (Cont, Result).
+    cont_reply(Cont, Result, State).
 
 %% setxattr(_Ctx, _Inode, _Name, _Value, _Flags, _Cont, _State) ->
 %%     io:format("ni: setxattr~n"),
@@ -811,7 +840,7 @@ setlk_async(Ctx, Ino, Fi, Lock, Sleep, Cont, State) ->
 
 
 unlink(Ctx, ParentIno, Name, Cont, State) ->
-    spawn_link(fun () -> unlink_async(Ctx, ParentIno, Name, Cont, State) end),
+    spawn_link(fun () -> register_cont(Cont, ParentIno, State), unlink_async(Ctx, ParentIno, Name, Cont, State) end),
     { noreply, State }.
 
 unlink_async(Ctx, ParentIno, Name, Cont, State) ->
@@ -823,7 +852,7 @@ unlink_async(Ctx, ParentIno, Name, Cont, State) ->
         _ ->
             enoent
     end,
-    fuserlsrv:reply (Cont, #fuse_reply_err{ err = Result }).
+    cont_reply(Cont, #fuse_reply_err{ err = Result }, State).
        
 %%%%%%%%%%%
 -define(HEARTBEAT_INTERVAL, 10000).
@@ -867,6 +896,14 @@ take_while (F, Acc, [ H | T ]) ->
      stop ->
        []
    end.
+
+register_cont(Cont, Ino, #amqpfs{ fuse_continuations = Continuations }) ->
+    ets:insert(Continuations, {Cont, Ino}).
+
+cont_reply(Cont, Result, #amqpfs{ fuse_continuations = Continuations }) ->
+    fuserlsrv:reply(Cont, Result),
+    ets:delete(Continuations, Cont).
+    
 
 make_inode(Name,Extra, State) ->
   case ets:lookup (State#amqpfs.names, Name) of

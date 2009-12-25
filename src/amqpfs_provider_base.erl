@@ -12,7 +12,7 @@
          append/3,
          write/4, output/4, flush/3,
          readable/3, writable/3, executable/3,
-         access/3,
+         access/3, access_dir/3,
          uid/2, gid/2,
          mode/2,
          get_lock/4, set_lock/5,
@@ -118,6 +118,11 @@ writable(_Path, _Group, _State) ->
 
 executable(_Path, _Group, _State) ->
     false.
+
+access_dir(Path, Mask, State) when (Mask band ?X_OK > 0) ->
+    amqpfs_provider:call_module(access_dir,[Path, Mask bxor ?X_OK bor ?R_OK, State], State);
+access_dir(Path, Mask, State) ->
+    amqpfs_provider:call_module(access,[Path,Mask,State], State).
 
 access(Path, Mask, State) ->
     TestFunctor = fun (Permission) ->

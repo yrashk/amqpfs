@@ -23,6 +23,7 @@
                    names,
                    announcements,
                    providers,
+                   fuse_continuations,
                    response_routes,
                    response_cache,
                    response_policies,
