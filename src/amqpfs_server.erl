@@ -472,8 +472,7 @@ write_async(Ctx, Ino, Data, Offset, _Fi, Cont, State) ->
             Response = remote(Path, {write, Path, Data, Offset}, Ctx, State),
             case Response of
                 Count when is_integer(Count) -> #fuse_reply_write{ count = Count };
-                eio -> #fuse_reply_err { err = eio};
-                _ -> #fuse_reply_err { err = einval}
+                Err -> #fuse_reply_err { err = Err }
             end;
         _ ->
             #fuse_reply_err{ err = enoent }
