@@ -239,7 +239,7 @@ removexattr(_Path, _Name, _State) ->
     ok.
 
 getxattr(_Path, _Name, _State) ->
-    <<>>.
+    enotsup.
 
 listxattr(_Path, _State) ->
     [].
