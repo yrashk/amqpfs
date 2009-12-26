@@ -629,13 +629,13 @@ mknod(Ctx, ParentIno, Name, Mode, Dev, Cont, State) ->
     {noreply, State}.
 
     
-
-mknod_async(Ctx, ParentIno, Name, Mode, _Dev, Cont, State) ->
-    Result = 
+do_mknod(Ctx, ParentIno, NameBin, Mode, _Cont, State) ->
+    Name = binary_to_list(NameBin),
     case ets:lookup(State#amqpfs.inodes, ParentIno) of
         [{ParentIno,Path}] ->
             case remote(Path, {create, Path, Name, Mode}, Ctx, State) of
                 ok ->
+                    FullPath = amqpfs_util:concat_path([Path,Name]),
                     Extra =
                     case Mode band ?S_IFMT of
                         ?S_IFREG ->
@@ -645,10 +645,11 @@ mknod_async(Ctx, ParentIno, Name, Mode, _Dev, Cont, State) ->
                         ?S_IFLNK ->
                             {symlink, on_demand}
                     end,
+                    {Ino, _} = make_inode(FullPath, Extra, State),
                     Param = #fuse_entry_param {
-                      ino = make_inode(amqpfs_util:concat_path([Path,Name]), Extra, State),
+                      ino = Ino,
                       generation = 1,
-                      attr = remote_getattr(Path, Ctx, State),
+                      attr = remote_getattr(FullPath, Ctx, State),
                       attr_timeout_ms = 100,
                       entry_timeout_ms = 100
                      },
@@ -658,8 +659,10 @@ mknod_async(Ctx, ParentIno, Name, Mode, _Dev, Cont, State) ->
             end;
         _ ->
             #fuse_reply_err{ err = enoent }
-    end,
-    cont_reply(Cont, Result, State).   
+    end.
+    
+mknod_async(Ctx, ParentIno, Name, Mode, _Dev, Cont, State) ->
+    cont_reply(Cont, do_mknod(Ctx, ParentIno, Name, Mode, Cont, State), State).   
 
 
 create(Ctx, ParentIno, Name, Mode, Fi, Cont, State) ->
@@ -670,33 +673,21 @@ create(Ctx, ParentIno, Name, Mode, Fi, Cont, State) ->
        end),
     { noreply, State }.
 
-create_async(Ctx, ParentIno, Name, Mode, Fi, Cont, State) ->
+create_async(Ctx, ParentIno, NameBin, Mode, Fi, Cont, State) ->
     Result = 
-    case ets:lookup(State#amqpfs.inodes, ParentIno) of
-        [{ParentIno,Path}] ->
-            case remote(Path, {create, Path, Name, Mode}, Ctx, State) of
-                ok ->
-                    Extra = 
-                    case Mode band ?S_IFMT of
-                        ?S_IFREG ->
-                            {file, on_demand};
-                        ?S_IFDIR ->
-                            {directory, on_demand};
-                        ?S_IFLNK ->
-                            {symlink, on_demand}
-                    end,
-                    make_inode(amqpfs_util:concat_path([Path,Name]), Extra, State),
-                    Response = remote(Path, {open, Path, Fi}, Ctx, State),
-                    case Response of
-                        ok -> #fuse_reply_open{fuse_file_info = Fi};
-                        Err -> #fuse_reply_err { err = Err }
-                    end;
-                Err ->
-                    #fuse_reply_err { err = Err }
-            end;
-        _ ->
-            #fuse_reply_err{ err = enoent }
-    end,
+        case do_mknod(Ctx, ParentIno, NameBin, Mode, Cont, State) of
+            #fuse_reply_entry{ fuse_entry_param = Param } ->
+                #fuse_entry_param { ino = Ino } = Param,
+                [{Ino, Path}] = ets:lookup(State#amqpfs.inodes, Ino),
+                Response = remote(Path, {open, Path, Fi}, Ctx, State),
+                case Response of
+                    ok -> 
+                        #fuse_reply_create{ fuse_file_info = Fi, fuse_entry_param = Param };
+                    Err -> #fuse_reply_err { err = Err }
+                end;
+            Other ->
+                Other
+        end,
     cont_reply(Cont, Result, State).   
 
 release(Ctx, Ino, Fi, Cont, State) ->
