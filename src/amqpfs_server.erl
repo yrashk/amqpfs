@@ -406,6 +406,7 @@ readdir_async(Ctx, Ino, Size, Offset, _Fi, Cont, #amqpfs{}=State) ->
                 end
                 % according to FuseInvariants wiki page on FUSE, readdir() is only called with an existing directory name, so there is no other clause in this case
         end,
+    NewOffset = erlang:min(Offset, length(Contents)+2),
     DirEntryList = 
         take_while 
           (fun (E, { Total, Max }) -> 
@@ -419,7 +420,7 @@ readdir_async(Ctx, Ino, Size, Offset, _Fi, Cont, #amqpfs{}=State) ->
            end,
            { 0, Size },
            lists:nthtail 
-           (Offset,
+           (NewOffset,
             [ #direntry{ name = ".", offset = 1, stat = remote_getattr(Path, Ctx, State) },
               #direntry{ name = "..", offset = 2, stat = remote_getattr(filename:dirname(Path), Ctx, State) }
              ] ++ Contents)),
