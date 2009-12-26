@@ -111,6 +111,7 @@ rename(Path, NewPath, #amqpfs_provider_state{ extra = RamFS }) ->
     Name = hd(lists:reverse(Path)),
     NewName = filename:basename(NewPath),
     Base = lists:reverse(tl(lists:reverse(Path))),
+    NewBase = string:tokens(filename:dirname(NewPath),"/"),
     [{Name, Base, Type}] = ets:match_object(Files, {Name, Base, '_'}),
     Object = 
     case ets:lookup(Objects, Path) of
@@ -122,7 +123,7 @@ rename(Path, NewPath, #amqpfs_provider_state{ extra = RamFS }) ->
     [{Path, ATime, MTime}] = ets:lookup(Attrs, Path),
     ets:insert(Objects, {string:tokens(NewPath,"/"), Object}),
     ets:insert(Attrs, {string:tokens(NewPath,"/"), ATime, MTime}),
-    ets:insert(Files, {NewName, Base, Type}),
+    ets:insert(Files, {NewName, NewBase, Type}),
     ets:match_delete(Files,  {Name, Base, '_'}),
     ets:delete(Objects, Path),
     ets:delete(Attrs, Path),
