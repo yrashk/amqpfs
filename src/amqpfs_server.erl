@@ -842,7 +842,12 @@ statfs_async(Ctx, Ino, Cont, State) ->
                         #fuse_reply_err{ err = Res }
                 end;
             _ ->
-                #fuse_reply_err{ err = enoent }
+                case ets:first(State#amqpfs.inodes) of
+                    '$end_of_table' -> % no inodes yet
+                        #fuse_reply_statfs{ statvfs = #statvfs{} };
+                    _ ->
+                        #fuse_reply_err{ err = enoent }
+                end
         end,
     cont_reply(Cont, Result, State).
 
