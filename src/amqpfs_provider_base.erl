@@ -6,7 +6,7 @@
          rmdir/2, remove/2,
          rename/3, link/3, symlink/3, readlink/2,
          open/3, release/3,
-         read/4, getattr/2, setattr/5,
+         read/4, getattr/2, setattr/5, setxattr/5, removexattr/3, getxattr/3, listxattr/2,
          object/2, size/2, resize/3,
          atime/2, mtime/2, set_atime/3, set_mtime/3,
          append/3,
@@ -232,6 +232,17 @@ setattr(Path, Stat, Attr, ToSet, State) ->
                st_atime = NewATime,
                st_mtime = NewMTime }.
 
+setxattr(_Path, _Name, _Value, _Flags, _State) ->
+    ok.
+
+removexattr(_Path, _Name, _State) ->
+    ok.
+
+getxattr(_Path, _Name, _State) ->
+    <<>>.
+
+listxattr(_Path, _State) ->
+    [].
 
 mode(_Path, _State) ->
     0.

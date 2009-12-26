@@ -116,6 +116,14 @@ handle_info_async({#'basic.deliver'{consumer_tag=_ConsumerTag, delivery_tag=_Del
                     send_response(ReplyTo, MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(access_dir, [tokenize_path(Path),Mask, ReqState], ReqState)), ReqState);                
                 {statfs, Path} ->
                     send_response(ReplyTo, MessageId, ?CONTENT_TYPE_BERT, [ttl(Path, ReqState)], term_to_binary(call_module(statfs, [tokenize_path(Path), ReqState], ReqState)), ReqState);
+                {setxattr, Path, Name, Value, Flag} ->
+                    send_response(ReplyTo, MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(setxattr, [tokenize_path(Path), Name, Value, Flag, ReqState], ReqState)), ReqState);                
+                {removexattr, Path, Name} ->
+                    send_response(ReplyTo, MessageId, ?CONTENT_TYPE_BERT, [], term_to_binary(call_module(removexattr, [tokenize_path(Path), Name, ReqState], ReqState)), ReqState);                
+                {getxattr, Path, Name} ->
+                    send_response(ReplyTo, MessageId, ?CONTENT_TYPE_BERT, [ttl(Path, ReqState)], term_to_binary(call_module(getxattr, [tokenize_path(Path), Name, ReqState], ReqState)), ReqState);                
+                {listxattr, Path} ->
+                    send_response(ReplyTo, MessageId, ?CONTENT_TYPE_BERT, [ttl(Path, ReqState)], term_to_binary(call_module(listxattr, [tokenize_path(Path), ReqState], ReqState)), ReqState);                
                 _ ->
                     ignore
             end

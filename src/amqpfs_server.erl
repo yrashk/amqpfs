@@ -32,11 +32,11 @@
            setlk/7,
            link/6,
            mkdir/6,
-%%            removexattr/5,
+           removexattr/5,
            rename/7,
            rmdir/5,
            setattr/7,
-%%            setxattr/7,
+           setxattr/7,
            statfs/4,
            symlink/6,
            unlink/5
@@ -545,28 +545,6 @@ fsync (_Ctx, _Inode, _IsDataSync, _Fi, _Cont, State) ->
 fsyncdir (_Ctx, _Inode, _IsDataSync, _Fi, _Cont, State) ->
   { #fuse_reply_err{ err = ok }, State }.
 
-getxattr(Ctx, Ino, Name, Size, Cont, State) ->
-    spawn_link(fun () ->
-                       register_cont(Cont, Ino, State),
-                       getxattr_async(Ctx,
-                                        Ino,
-                                        Name,
-                                        Size,
-                                        Cont,
-                                        State) 
-               end),
-    { noreply, State }.
-
-getxattr_async(_Ctx, _Ino, _Name, _Size, Cont, State) ->
-    cont_reply(Cont, #fuse_reply_err{ err = enotsup }, State).
-
-listxattr(Ctx, Ino, Size, Cont, State) ->
-  spawn_link(fun () -> register_cont(Cont, Ino, State), listxattr_async(Ctx, Ino, Size, Cont, State) end),
-  { noreply, State }.
-
-listxattr_async(_Ctx, _Ino, _Size, Cont, State) ->
-    cont_reply(Cont, #fuse_reply_err{ err = erange }, State).
-
 link(Ctx, Ino, NewParentIno, NewName, Cont, State) ->
     spawn_link(fun () -> register_cont(Cont, Ino, State), register_cont(Cont, NewParentIno, State), link_async(Ctx, Ino, NewParentIno, NewName, Cont, State) end),
     {noreply, State}.
@@ -755,10 +733,8 @@ mkdir(Ctx, ParentIno, Name, Mode, Cont, State) ->
     mknod(Ctx, ParentIno, Name, Mode bor ?S_IFDIR, {0,0}, Cont, State).
 
 
-%% removexattr(_Ctx, _Inode, _Name, _Cont, _State) ->
 %%     io:format("ni: removexattr~n"),
 %%     erlang:throw(not_implemented).
-
 rename(Ctx, ParentIno, NameBin, NewParentIno, NewNameBin, Cont, State) ->
     Name = binary_to_list(NameBin),
     NewName = binary_to_list(NewNameBin),
@@ -839,9 +815,122 @@ setlk_async(Ctx, Ino, Fi, Lock, Sleep, Cont, State) ->
         end,
     cont_reply(Cont, Result, State).
 
-%% setxattr(_Ctx, _Inode, _Name, _Value, _Flags, _Cont, _State) ->
-%%     io:format("ni: setxattr~n"),
-%%     erlang:throw(not_implemented).
+setxattr(Ctx, Ino, Name, Value, Flags, Cont, State) ->
+    spawn_link(fun () ->
+                       register_cont(Cont, Ino, State),
+                       setxattr_async(Ctx, Ino, Name, Value, Flags, Cont, State)
+               end),
+    {noreply, State}.
+
+
+setxattr_async(Ctx, Ino, NameBin, ValueBin, Flags, Cont, State) ->
+    Name = binary_to_list(NameBin),
+    Value = binary_to_list(ValueBin),
+    Result =
+        case ets:lookup(State#amqpfs.inodes, Ino) of
+            [{Ino,Path}] ->
+                AtomFlag = if (Flags band ?XATTR_CREATE > 0) ->
+                                   create;
+                              (Flags band ?XATTR_REPLACE > 0) ->
+                                   replace;
+                              true ->
+                                   undefined
+                           end,
+                case remote(Path, {setxattr, Path, Name, Value, AtomFlag}, Ctx, State) of
+                    Res ->
+                        #fuse_reply_err{ err = Res }
+                end;
+            _ ->
+                #fuse_reply_err{ err = enoent }
+        end,
+    cont_reply(Cont, Result, State).
+
+removexattr(Ctx, Ino, Name, Cont, State) ->
+    spawn_link(fun () ->
+                       register_cont(Cont, Ino, State),
+                       removexattr_async(Ctx, Ino, Name, Cont, State)
+               end),
+    {noreply, State}.
+
+removexattr_async(Ctx, Ino, NameBin, Cont, State) ->
+    Name = binary_to_list(NameBin),
+    Result =
+        case ets:lookup(State#amqpfs.inodes, Ino) of
+            [{Ino,Path}] ->
+                case remote(Path, {removexattr, Path, Name}, Ctx, State) of
+                    Res ->
+                        #fuse_reply_err{ err = Res }
+                end;
+            _ ->
+                #fuse_reply_err{ err = enoent }
+        end,
+    cont_reply(Cont, Result, State).
+    
+
+getxattr(Ctx, Ino, Name, Size, Cont, State) ->
+    spawn_link(fun () ->
+                       register_cont(Cont, Ino, State),
+                       getxattr_async(Ctx,
+                                        Ino,
+                                        Name,
+                                        Size,
+                                        Cont,
+                                        State) 
+               end),
+    { noreply, State }.
+
+getxattr_async(Ctx, Ino, NameBin, Size, Cont, State) ->
+    Name = binary_to_list(NameBin),
+    Result =
+        case ets:lookup(State#amqpfs.inodes, Ino) of
+            [{Ino,Path}] ->
+                case remote(Path, {getxattr, Path, Name}, Ctx, State) of
+                    Err when is_atom(Err) ->
+                        #fuse_reply_err{ err = Err };
+                    Data when Size =:= 0 ->
+                        #fuse_reply_buf{ buf = Data, size = iolist_size(Data) };
+                    Data ->
+                        case (Size < iolist_size(Data)) of
+                            true ->
+                                #fuse_reply_err { err = erange };
+                            false ->
+                                #fuse_reply_buf{ buf = Data, size = Size }
+                        end
+                end;
+            _ ->
+                #fuse_reply_err{ err = enoent }
+        end,
+    cont_reply(Cont, Result, State).
+
+listxattr(Ctx, Ino, Size, Cont, State) ->
+  spawn_link(fun () -> register_cont(Cont, Ino, State), listxattr_async(Ctx, Ino, Size, Cont, State) end),
+  { noreply, State }.
+
+listxattr_async(Ctx, Ino, Size, Cont, State) ->
+    Result =
+        case ets:lookup(State#amqpfs.inodes, Ino) of
+            [{Ino,Path}] ->
+                case remote(Path, {listxattr, Path}, Ctx, State) of
+                    Err when is_atom(Err) ->
+                        #fuse_reply_err{ err = Err };
+                    Data when Size =:= 0 ->
+                        TokenizedData = null_tokenize(Data),
+                        #fuse_reply_buf{ buf = TokenizedData, size = iolist_size(TokenizedData) };
+                    Data ->
+                        TokenizedData = null_tokenize(Data),
+                        case (Size < iolist_size(TokenizedData)) of
+                            true ->
+                                #fuse_reply_err { err = erange };
+                            false ->
+                                #fuse_reply_buf{ buf = TokenizedData, size = Size }
+                        end
+                end;
+            _ ->
+                #fuse_reply_err{ err = enoent }
+        end,
+    cont_reply(Cont, Result, State).
+
+
 
 statfs(Ctx, Ino, Cont, State) ->
     spawn_link(fun () -> register_cont(Cont, Ino, State), statfs_async(Ctx, Ino, Cont, State) end),
@@ -1042,3 +1131,6 @@ ctx_headers(#fuse_ctx{uid = UID, gid = GID, pid = PID}) ->
 
 empty_inodes(State) ->
     ets:first(State#amqpfs.inodes) =:= '$end_of_table'.
+
+null_tokenize(List) ->
+    string:join(List, [0]).

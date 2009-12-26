@@ -1,10 +1,10 @@
 * TODO Implement missing calls
 ** DONE link
 ** DONE mkdir
-** TODO removexattr
+** DONE removexattr
 ** DONE rename
 ** DONE rmdir
-** TODO setxattr
+** DONE setxattr
 ** DONE statfs
 ** DONE symlink
 ** DONE unlink
@@ -16,8 +16,8 @@
 ** DONE flush
 ** TODO forget
 ** TODO fsync/fsyncdir
-** TODO getxattr
-** TODO listxattr
+** DONE getxattr
+** DONE listxattr
 ** DONE mknod
 ** DONE create
 ** TODO releasedir
