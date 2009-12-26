@@ -6,7 +6,8 @@
          create/4, create_dir/4,
          object/2,
          append/3, write/4,
-         resize/3
+         resize/3,
+         rmdir/2, remove/2
          ]).
 
 -record(ramfs,
@@ -73,14 +74,8 @@ write(Path, Data, Offset, #amqpfs_provider_state{ extra = RamFS }) ->
     #ramfs{ objects = Objects } = RamFS,
     case ets:lookup(Objects, Path) of
         [{Path, Object}] ->
-            NewOffset = 
-                case Offset > size(Object) of
-                    true ->
-                        size(Object);
-                    false ->
-                        Offset
-                end,
-            {ObjectBeforeOffset, ObjectOnAndAfterOffset} = erlang:split_binary(Object, NewOffset + 1),
+            NewOffset = erlang:min(Offset, size(Object)),
+            {ObjectBeforeOffset, ObjectOnAndAfterOffset} = erlang:split_binary(Object, NewOffset),
             {_, RestOfTheObject} = erlang:split_binary(ObjectOnAndAfterOffset, size(Data)),
             ets:insert(Objects, {Path, erlang:list_to_binary([ObjectBeforeOffset, Data, RestOfTheObject])}),
             size(Data);
@@ -102,6 +97,19 @@ resize(Path, NewSize, #amqpfs_provider_state{ extra = RamFS }) ->
             NewSize
     end.
 
+rmdir(Path, #amqpfs_provider_state{ extra = RamFS }) ->
+    #ramfs{ files = Files } = RamFS,
+    Name = hd(lists:reverse(Path)),
+    Base = lists:reverse(tl(lists:reverse(Path))),
+    ets:match_delete(Files, {Name, Base, '_', '_'}),
+    ets:match_delete(Files, {'_', Path, '_', '_'}),
+    ok.
 
-    
+remove(Path, #amqpfs_provider_state{ extra = RamFS }) ->
+    #ramfs{ files = Files, objects = Objects } = RamFS,
+    Name = hd(lists:reverse(Path)),
+    Base = lists:reverse(tl(lists:reverse(Path))),
+    ets:match_delete(Files, {Name, Base, '_', '_'}),
+    ets:delete(Objects, Path),
+    ok.
     
