@@ -110,7 +110,6 @@ rmdir(Path, #amqpfs_provider_state{ extra = RamFS }) ->
     Name = hd(lists:reverse(Path)),
     Base = lists:reverse(tl(lists:reverse(Path))),
     ets:match_delete(Files, {Name, Base, '_'}),
-    ets:match_delete(Files, {'_', Path, '_'}),
     ets:delete(Attrs, Path),
     ok.
 
