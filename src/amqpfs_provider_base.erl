@@ -8,7 +8,7 @@
          open/3, release/3,
          read/4, getattr/2, setattr/5,
          object/2, size/2, resize/3,
-         atime/2, mtime/2,
+         atime/2, mtime/2, set_atime/3, set_mtime/3,
          append/3,
          write/4, output/4, flush/3,
          readable/3, writable/3, executable/3,
@@ -65,16 +65,23 @@ release(_Path, _Fi, _State) ->
 read(Path, Size, Offset, State) ->
     Result =
     case amqpfs_provider:call_module(object, [Path, State], State) of
+        Error when is_atom(Error) ->
+            Error;
         Datum when is_list(Datum) ->
             list_to_binary(Datum);
         Datum when is_binary(Datum) ->
             Datum
     end,
-    ProperOffset = erlang:min(Offset, size(Result)),
-    {_, Result1} = split_binary(Result, ProperOffset),
-    ProperSize = erlang:min(Size, size(Result1)),
-    {Result2, _} = split_binary(Result1, ProperSize),
-    Result2.
+    case Result of 
+        Err when is_atom(Err) ->
+            Err;
+        _ ->
+            ProperOffset = erlang:min(Offset, size(Result)),
+            {_, Result1} = split_binary(Result, ProperOffset),
+            ProperSize = erlang:min(Size, size(Result1)),
+            {Result2, _} = split_binary(Result1, ProperSize),
+            Result2
+    end.
 
 append(_Path, _Data, _State) ->
     eio. % we do not know what to do with appending by default
@@ -109,6 +116,12 @@ atime(_Path, _State) ->
 
 mtime(_Path, _State) ->
     erlang:localtime().
+
+set_atime(_Path, Datetime, _State) ->
+    Datetime.
+
+set_mtime(_Path, Datetime, _State) ->
+    Datetime.
 
 readable(_Path, _Group, _State) ->
     true.
@@ -198,12 +211,16 @@ setattr(Path, Stat, Attr, ToSet, State) ->
         end,
     
     NewATime = 
-        if ToSet band ?FUSE_SET_ATTR_ATIME > 0 -> Attr#stat.st_atime;
+        if ToSet band ?FUSE_SET_ATTR_ATIME > 0 -> 
+                amqpfs_provider:call_module(set_atime, [Path, amqpfs_util:unixtime_to_datetime(Attr#stat.st_atime), State], State),
+                Attr#stat.st_atime;
            true -> Stat#stat.st_atime
         end,
     
     NewMTime = 
-        if ToSet band ?FUSE_SET_ATTR_MTIME > 0 -> Attr#stat.st_mtime;
+        if ToSet band ?FUSE_SET_ATTR_MTIME > 0 -> 
+                amqpfs_provider:call_module(set_mtime, [Path, amqpfs_util:unixtime_to_datetime(Attr#stat.st_mtime), State], State),
+                Attr#stat.st_mtime;
            true -> Stat#stat.st_mtime
         end,
     

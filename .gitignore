@@ -1,3 +1,4 @@
 ebin/*.beam
 tests/*.beam
+samples/*.beam
 erl_crash.dump
