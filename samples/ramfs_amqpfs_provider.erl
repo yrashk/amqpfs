@@ -7,6 +7,7 @@
          object/2,
          append/3, write/4,
          resize/3,
+         rename/3,
          rmdir/2, remove/2,
          atime/2, mtime/2,
          set_atime/3, set_mtime/3
@@ -104,6 +105,29 @@ resize(Path, NewSize, #amqpfs_provider_state{ extra = RamFS }) ->
             ets:insert(Objects, {Path, <<0:BitSize>>}),
             NewSize
     end.
+
+rename(Path, NewPath, #amqpfs_provider_state{ extra = RamFS }) ->
+    #ramfs{ objects = Objects, files = Files, attrs = Attrs } = RamFS,
+    Name = hd(lists:reverse(Path)),
+    NewName = filename:basename(NewPath),
+    Base = lists:reverse(tl(lists:reverse(Path))),
+    [{Name, Base, Type}] = ets:match_object(Files, {Name, Base, '_'}),
+    Object = 
+    case ets:lookup(Objects, Path) of
+        [{Path, Obj}] ->
+            Obj;
+        [] ->
+            <<>>
+    end,
+    [{Path, ATime, MTime}] = ets:lookup(Attrs, Path),
+    ets:insert(Objects, {string:tokens(NewPath,"/"), Object}),
+    ets:insert(Attrs, {string:tokens(NewPath,"/"), ATime, MTime}),
+    ets:insert(Files, {NewName, Base, Type}),
+    ets:match_delete(Files,  {Name, Base, '_'}),
+    ets:delete(Objects, Path),
+    ets:delete(Attrs, Path),
+    ok.
+    
 
 rmdir(Path, #amqpfs_provider_state{ extra = RamFS }) ->
     #ramfs{ files = Files, attrs = Attrs } = RamFS,
