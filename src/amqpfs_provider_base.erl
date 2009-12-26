@@ -16,6 +16,7 @@
          uid/2, gid/2,
          mode/2,
          get_lock/4, set_lock/5,
+         statfs/2,
          handle_info/2,
          ttl/2,
          allow_request/1]).
@@ -258,6 +259,12 @@ getattr(Path,State) ->
            st_uid = UID,
            st_gid = GID
          }.
+
+statfs(_Path, _State) ->
+    #statvfs{
+        f_bsize = 4096,
+        f_namemax = 1024
+       }.
 
 handle_info(_Msg, _State) ->
     ignore.

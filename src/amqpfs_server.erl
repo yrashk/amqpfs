@@ -37,7 +37,7 @@
            rmdir/5,
            setattr/7,
 %%            setxattr/7,
-%%            statfs/4,
+           statfs/4,
            symlink/6,
            unlink/5
 
@@ -827,9 +827,24 @@ setlk_async(Ctx, Ino, Fi, Lock, Sleep, Cont, State) ->
 %%     io:format("ni: setxattr~n"),
 %%     erlang:throw(not_implemented).
 
-%% statfs(_Ctx, _Inode, _Cont, State) ->
-%%     io:format("ni: statfs~n"),
-%%     {noreply, State}.
+statfs(Ctx, Ino, Cont, State) ->
+    spawn_link(fun () -> register_cont(Cont, Ino, State), statfs_async(Ctx, Ino, Cont, State) end),
+    {noreply, State}.
+
+statfs_async(Ctx, Ino, Cont, State) ->
+    Result =
+        case ets:lookup(State#amqpfs.inodes, Ino) of
+            [{Ino,Path}] ->
+                case remote(Path, {statfs, Path}, Ctx, State) of
+                    #statvfs{}=Res ->
+                        #fuse_reply_statfs{ statvfs = Res };
+                    Res ->
+                        #fuse_reply_err{ err = Res }
+                end;
+            _ ->
+                #fuse_reply_err{ err = enoent }
+        end,
+    cont_reply(Cont, Result, State).
 
 
 unlink(Ctx, ParentIno, Name, Cont, State) ->

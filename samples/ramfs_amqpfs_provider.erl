@@ -10,7 +10,8 @@
          rename/3,
          rmdir/2, remove/2,
          atime/2, mtime/2,
-         set_atime/3, set_mtime/3
+         set_atime/3, set_mtime/3,
+         statfs/2
          ]).
 
 -record(ramfs,
@@ -69,6 +70,7 @@ object(Path, #amqpfs_provider_state{ extra = RamFS }) ->
     end.
 
 append(Path, Data, #amqpfs_provider_state{ extra = RamFS }) ->
+    io:format("~p~n",[size(Data)]),
     #ramfs{ objects = Objects } = RamFS,
     case ets:lookup(Objects, Path) of
         [{Path, Object}] ->
@@ -80,6 +82,7 @@ append(Path, Data, #amqpfs_provider_state{ extra = RamFS }) ->
     end.
 
 write(Path, Data, Offset, #amqpfs_provider_state{ extra = RamFS }) ->
+    io:format("~p~n",[size(Data)]),
     #ramfs{ objects = Objects } = RamFS,
     case ets:lookup(Objects, Path) of
         [{Path, Object}] ->
@@ -178,3 +181,9 @@ set_atime(Path, Datetime, #amqpfs_provider_state{ extra = RamFS }) ->
 set_mtime(Path, Datetime, #amqpfs_provider_state{ extra = RamFS }) ->
     #ramfs{ attrs = Attrs } = RamFS,
     ets:update_element(Attrs, Path, {3, Datetime}).
+
+statfs(_,_) ->
+    #statvfs { 
+        f_bsize = 1024*1024,
+        f_namemax = 4096
+       }.
