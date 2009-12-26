@@ -7,13 +7,16 @@
          object/2,
          append/3, write/4,
          resize/3,
-         rmdir/2, remove/2
+         rmdir/2, remove/2,
+         atime/2, mtime/2,
+         set_atime/3, set_mtime/3
          ]).
 
 -record(ramfs,
         {
           files,
-          objects
+          objects,
+          attrs
         }).
 
 -include_lib("amqpfs/include/amqpfs.hrl").
@@ -21,30 +24,35 @@
 init(#amqpfs_provider_state{ args = Args } = State) ->
     RamFS = #ramfs {
       files = ets:new(ramfs_files, [public, bag]),
-      objects = ets:new(ramfs_objects, [public, set])
+      objects = ets:new(ramfs_objects, [public, set]),
+      attrs = ets:new(ramfs_attrs, [public, set])
      },
     amqpfs_provider:announce(directory, proplists:get_value(dir, Args, "/ramfs"), State),
     State#amqpfs_provider_state{ extra = RamFS }.
 
 list_dir(Path, #amqpfs_provider_state{ extra = RamFS }) ->
     #ramfs{ files = Files } = RamFS,
-    lists:map(fun ([Name, Type]) -> {Name, Type} end, ets:match(Files,{'$1',Path,'$2','_'})).
+    lists:map(fun ([Name, Type]) -> {Name, Type} end, ets:match(Files,{'$1',Path,'$2'})).
 
 create(Path, Name, _Mode, #amqpfs_provider_state{ extra = RamFS }) ->
-    #ramfs{ files = Files } = RamFS,
-    case ets:match(Files, {Name, Path, '_','_'}) of
+    #ramfs{ files = Files, attrs = Attrs } = RamFS,
+    case ets:match(Files, {Name, Path, '_'}) of
         [] ->
-            ets:insert(Files, {Name, Path, {file, on_demand}, undefined}),
+            Now = calendar:local_time(),
+            ets:insert(Files, {Name, Path, {file, on_demand}}),
+            ets:insert(Attrs, {Path ++ [Name], Now, Now}), % atime, mtime
             ok;
         _ ->
             eexist
     end.
 
 create_dir(Path, Name, _Mode, #amqpfs_provider_state{ extra = RamFS }) ->
-    #ramfs{ files = Files } = RamFS,
+    #ramfs{ files = Files, attrs = Attrs } = RamFS,
     case ets:match(Files, {Name, Path, '_','_'}) of
         [] ->
-            ets:insert(Files, {Name, Path, {directory, on_demand}, undefined}),
+            Now = calendar:local_time(),
+            ets:insert(Files, {Name, Path, {directory, on_demand}}),
+            ets:insert(Attrs, {Path ++ [Name], Now, Now}), % atime, mtime
             ok;
         _ ->
             eexist
@@ -98,18 +106,51 @@ resize(Path, NewSize, #amqpfs_provider_state{ extra = RamFS }) ->
     end.
 
 rmdir(Path, #amqpfs_provider_state{ extra = RamFS }) ->
-    #ramfs{ files = Files } = RamFS,
+    #ramfs{ files = Files, attrs = Attrs } = RamFS,
     Name = hd(lists:reverse(Path)),
     Base = lists:reverse(tl(lists:reverse(Path))),
-    ets:match_delete(Files, {Name, Base, '_', '_'}),
-    ets:match_delete(Files, {'_', Path, '_', '_'}),
+    ets:match_delete(Files, {Name, Base, '_'}),
+    ets:match_delete(Files, {'_', Path, '_'}),
+    ets:delete(Attrs, Path),
     ok.
 
 remove(Path, #amqpfs_provider_state{ extra = RamFS }) ->
-    #ramfs{ files = Files, objects = Objects } = RamFS,
+    #ramfs{ files = Files, objects = Objects, attrs = Attrs } = RamFS,
     Name = hd(lists:reverse(Path)),
     Base = lists:reverse(tl(lists:reverse(Path))),
-    ets:match_delete(Files, {Name, Base, '_', '_'}),
+    ets:match_delete(Files, {Name, Base, '_'}),
     ets:delete(Objects, Path),
+    ets:delete(Attrs, Path),
     ok.
     
+atime(Path, #amqpfs_provider_state{ extra = RamFS }=State) ->
+    #ramfs{ attrs = Attrs } = RamFS,
+    case ets:lookup(Attrs, Path) of
+        [{Path, ATime, _}] -> 
+            ATime;
+        _ ->
+            Now = calendar:local_time(),
+            set_atime(Path, Now, State),
+            Now
+    end.
+
+mtime(Path, #amqpfs_provider_state{ extra = RamFS }=State) ->
+    #ramfs{ attrs = Attrs } = RamFS,
+    case ets:lookup(Attrs, Path) of
+        [{Path, _, MTime}] -> 
+            MTime;
+        _ ->
+            Now = calendar:local_time(),
+            set_mtime(Path, Now, State),
+            Now
+    end.
+    
+   
+set_atime(Path, Datetime, #amqpfs_provider_state{ extra = RamFS }) ->
+    #ramfs{ attrs = Attrs } = RamFS,
+    ets:update_element(Attrs, Path, {2, Datetime}).
+
+
+set_mtime(Path, Datetime, #amqpfs_provider_state{ extra = RamFS }) ->
+    #ramfs{ attrs = Attrs } = RamFS,
+    ets:update_element(Attrs, Path, {3, Datetime}).
