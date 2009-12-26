@@ -742,7 +742,9 @@ mkdir(Ctx, ParentIno, Name, Mode, Cont, State) ->
 %%     io:format("ni: removexattr~n"),
 %%     erlang:throw(not_implemented).
 
-rename(Ctx, ParentIno, Name, NewParentIno, NewName, Cont, State) ->
+rename(Ctx, ParentIno, NameBin, NewParentIno, NewNameBin, Cont, State) ->
+    Name = binary_to_list(NameBin),
+    NewName = binary_to_list(NewNameBin),
     spawn_link(fun () -> register_cont(Cont, ParentIno, State), register_cont(Cont, NewParentIno, State), rename_async(Ctx, ParentIno, Name, NewParentIno, NewName, Cont, State) end),
     {noreply, State}.
 
@@ -833,7 +835,8 @@ unlink(Ctx, ParentIno, Name, Cont, State) ->
     spawn_link(fun () -> register_cont(Cont, ParentIno, State), unlink_async(Ctx, ParentIno, Name, Cont, State) end),
     { noreply, State }.
 
-unlink_async(Ctx, ParentIno, Name, Cont, State) ->
+unlink_async(Ctx, ParentIno, NameBin, Cont, State) ->
+    Name = binary_to_list(NameBin),
     Result =
     case ets:lookup(State#amqpfs.inodes, ParentIno) of
         [{ParentIno,Path}] ->
