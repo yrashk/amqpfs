@@ -5,7 +5,7 @@
 ** DONE rename
 ** DONE rmdir
 ** TODO setxattr
-** TODO statfs
+** DONE statfs
 ** DONE symlink
 ** DONE unlink
 ** DONE setlk
