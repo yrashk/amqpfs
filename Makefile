@@ -40,7 +40,7 @@ vendor/fuserl/fuserldrv/Makefile: $(dir vendor/fuserl/fuserldrv)
 	cd vendor/fuserl/fuserldrv ; ./configure
 
 run: main
-	@erl -sname fstest -pa tests ebin vendor/erlang-ossp-uuid/ebin vendor/fuserl/fuserl/src/ vendor/erabbitmq/ebin/ vendor/rabbitmq-erlang-client/ebin/ vendor/rabbitmq-server/ebin/ -boot start_sasl -eval "application:load(fuserl)" -config configs/development -s erabbitmq -s amqpfs
+	@erl -sname amqpfs -pa samples ebin vendor/erlang-ossp-uuid/ebin vendor/fuserl/fuserl/src/ vendor/erabbitmq/ebin/ vendor/rabbitmq-erlang-client/ebin/ vendor/rabbitmq-server/ebin/ +A 32 -eval "application:load(fuserl)" -config configs/development -s erabbitmq -s amqpfs 
 
 run-simple: main
 	@erl -sname fstest -pa tests ebin vendor/erlang-ossp-uuid/ebin vendor/fuserl/fuserl/src/ vendor/erabbitmq/ebin/ vendor/rabbitmq-erlang-client/ebin/ vendor/rabbitmq-server/ebin/ +A 32 -eval "application:load(fuserl)" -config configs/development -s erabbitmq -s amqpfs -eval "amqpfs_provider:start(simple_amqpfs_provider)"
