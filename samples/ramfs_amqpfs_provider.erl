@@ -86,7 +86,8 @@ write(Path, Data, Offset, #amqpfs_provider_state{ extra = RamFS }) ->
         [{Path, Object}] ->
             NewOffset = erlang:min(Offset, size(Object)),
             {ObjectBeforeOffset, ObjectOnAndAfterOffset} = erlang:split_binary(Object, NewOffset),
-            {_, RestOfTheObject} = erlang:split_binary(ObjectOnAndAfterOffset, size(Data)),
+            Sz = erlang:min(size(ObjectOnAndAfterOffset), size(Data)),
+            {_, RestOfTheObject} = erlang:split_binary(ObjectOnAndAfterOffset, Sz),
             ets:insert(Objects, {Path, erlang:list_to_binary([ObjectBeforeOffset, Data, RestOfTheObject])}),
             size(Data);
         [] ->
