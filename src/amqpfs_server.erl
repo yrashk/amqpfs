@@ -894,7 +894,9 @@ getxattr_async(Ctx, Ino, NameBin, Size, Cont, State) ->
                             true ->
                                 #fuse_reply_err { err = erange };
                             false ->
-                                #fuse_reply_buf{ buf = Data, size = Size }
+                                Sz = (Size-size(Data))*8,
+                                NewData = erlang:list_to_binary([iolist_to_binary(Data),<<0:Sz>>]),
+                                #fuse_reply_buf{ buf = NewData, size = Size }
                         end
                 end;
             _ ->
@@ -922,7 +924,9 @@ listxattr_async(Ctx, Ino, Size, Cont, State) ->
                             true ->
                                 #fuse_reply_err { err = erange };
                             false ->
-                                #fuse_reply_buf{ buf = TokenizedData, size = Size }
+                                Sz = (Size-size(TokenizedData))*8,
+                                NewTokenizedData = erlang:list_to_binary([iolist_to_binary(TokenizedData),<<0:Sz>>]),
+                                #fuse_reply_buf{ buf = NewTokenizedData, size = Size }
                         end
                 end;
             _ ->
