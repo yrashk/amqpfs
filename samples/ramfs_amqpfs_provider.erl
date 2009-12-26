@@ -70,7 +70,6 @@ object(Path, #amqpfs_provider_state{ extra = RamFS }) ->
     end.
 
 append(Path, Data, #amqpfs_provider_state{ extra = RamFS }) ->
-    io:format("~p~n",[size(Data)]),
     #ramfs{ objects = Objects } = RamFS,
     case ets:lookup(Objects, Path) of
         [{Path, Object}] ->
