@@ -755,8 +755,8 @@ rename_async(Ctx, ParentIno, Name, NewParentIno, NewName, Cont, State) ->
         [{ParentIno,Path}] ->
             case ets:lookup(State#amqpfs.inodes, NewParentIno) of
                 [{NewParentIno,NewPath}] ->
-                    FullPath = amqpfs_util:concat_path([Path,binary_to_list(Name)]),
-                    NewFullPath = amqpfs_util:concat_path([NewPath,binary_to_list(NewName)]),
+                    FullPath = amqpfs_util:concat_path([Path,Name]),
+                    NewFullPath = amqpfs_util:concat_path([NewPath,NewName]),
                     remote(Path, {rename, FullPath, NewFullPath}, Ctx, State);
                 _ ->
                     enoent
