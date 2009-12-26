@@ -254,14 +254,20 @@ getattr_async(Ctx, Ino, Cont, State) ->
                 [{Path, { Ino, _ } }] ->
                     case remote_getattr(Path, Ctx, State) of
                         #stat{}=Stat -> #fuse_reply_attr{ attr = Stat, attr_timeout_ms = 1000 };
-                        Err -> #fuse_reply_err { err = Err}
+                        Err -> 
+                            #fuse_reply_err { err = Err}
                     end;
                 _ ->
                     #fuse_reply_err{ err = enoent }
             end;
 
         _ ->
-            #fuse_reply_err{ err = enoent }
+            case empty_inodes(State) of
+                true ->
+                    #fuse_reply_attr{ attr = #stat{ st_mode = ?S_IFDIR bor ?S_IXUSR bor ?S_IXGRP bor ?S_IXOTH  }, attr_timeout_ms = 1000 };
+                false ->
+                    #fuse_reply_err{ err = enoent }
+            end
     end,
     cont_reply (Cont, Result, State).
 
@@ -295,7 +301,7 @@ lookup_async(Ctx, ParentIno, BinPath, Cont, State) ->
             end,
             cont_reply (Cont, Result, State);
         _ ->
-            cont_reply (Cont, #fuse_reply_err{ err = enoent }, State)
+            cont_reply (Cont,#fuse_reply_err{ err = enoent }, State)
     end.
 
 lookup_impl(BinPath, Path, List, Ctx, State) ->
@@ -338,7 +344,12 @@ open_async(Ctx, Ino, Fi, Cont, State) ->
                 _ -> #fuse_reply_err { err = einval}
             end;
         _ ->
-            #fuse_reply_err{ err = enoent }
+            case empty_inodes(State) of
+                true ->
+                    #fuse_reply_open{fuse_file_info = Fi};
+                false ->
+                    #fuse_reply_err{ err = enoent }
+            end
     end,
     cont_reply(Cont, Result, State).
 
@@ -502,7 +513,12 @@ access_async(Ctx, Ino, Mask, Cont, State) ->
                     remote(Path, {access, directory, Path, Mask}, Ctx, State)
             end;
         _ ->
-            enoent
+            case empty_inodes(State) of
+                true -> 
+                    ok;
+                _ ->
+                    enoent
+            end
     end,
     cont_reply(Cont, #fuse_reply_err{ err = Result }, State).
 
@@ -842,8 +858,8 @@ statfs_async(Ctx, Ino, Cont, State) ->
                         #fuse_reply_err{ err = Res }
                 end;
             _ ->
-                case ets:first(State#amqpfs.inodes) of
-                    '$end_of_table' -> % no inodes yet
+                case empty_inodes(State) of
+                    true -> 
                         #fuse_reply_statfs{ statvfs = #statvfs{} };
                     _ ->
                         #fuse_reply_err{ err = enoent }
@@ -1023,3 +1039,6 @@ ctx_headers(#fuse_ctx{uid = UID, gid = GID, pid = PID}) ->
     [{"uid", long, UID},
      {"gid", long, GID},
      {"pid", long, PID}].
+
+empty_inodes(State) ->
+    ets:first(State#amqpfs.inodes) =:= '$end_of_table'.
