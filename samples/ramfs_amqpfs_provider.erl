@@ -10,7 +10,8 @@
          rename/3,
          rmdir/2, remove/2,
          atime/2, mtime/2,
-         set_atime/3, set_mtime/3
+         set_atime/3, set_mtime/3,
+         statfs/2
          ]).
 
 -record(ramfs,
@@ -178,3 +179,9 @@ set_atime(Path, Datetime, #amqpfs_provider_state{ extra = RamFS }) ->
 set_mtime(Path, Datetime, #amqpfs_provider_state{ extra = RamFS }) ->
     #ramfs{ attrs = Attrs } = RamFS,
     ets:update_element(Attrs, Path, {3, Datetime}).
+
+statfs(_,_) ->
+    #statvfs { 
+        f_bsize = 1024*1024,
+        f_namemax = 4096
+       }.

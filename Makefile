@@ -1,3 +1,8 @@
+
+ifeq ($(shell uname),Darwin)
+FUSE_CFLAGS = -D__DARWIN_64_BIT_INO_T=0 -mmacosx-version-min=10.5
+endif
+
 all: main
 
 main: submodules
@@ -37,7 +42,7 @@ vendor/fuserl/fuserldrv/src/fuserldrv: vendor/fuserl/fuserldrv/Makefile
 	cd vendor/fuserl/fuserldrv ; $(MAKE)
 
 vendor/fuserl/fuserldrv/Makefile: $(dir vendor/fuserl/fuserldrv)
-	cd vendor/fuserl/fuserldrv ; ./configure
+	cd vendor/fuserl/fuserldrv ; CFLAGS="$(FUSE_CFLAGS)" ./configure
 
 run: main
 	@erl -sname amqpfs -pa samples ebin vendor/erlang-ossp-uuid/ebin vendor/fuserl/fuserl/src/ vendor/erabbitmq/ebin/ vendor/rabbitmq-erlang-client/ebin/ vendor/rabbitmq-server/ebin/ +A 32 -eval "application:load(fuserl)" -config configs/development -s erabbitmq -s amqpfs 
