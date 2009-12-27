@@ -33,7 +33,7 @@ $ NODE=your@rabbitnode make run-mq #
 Platforms Compatibilities
 =========================
 
-* Ubuntu 9.10 x86, fuse 2.7.4 (32-bit) *WORKS*
+* Ubuntu 9.10 x86, fuse 2.7.4 (32-bit & 64-bit) *WORKS*
 * Intel Mac OS X 10.5.8, macfuse 2.0.3 (hasn't been tested for a while) *SUPPOSEDLY WORKS*
 * Intel Mac OS X 10.6.2, macfuse 2.0.3 *WORKS*
 
