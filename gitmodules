@@ -1,18 +1,18 @@
 [submodule "vendor/fuserl"]
 	path = vendor/fuserl
-	url = git://github.com/scallable/fuserl.git
+	url = %BASE%fuserl.git
 [submodule "vendor/rabbitmq-erlang-client"]
 	path = vendor/rabbitmq-erlang-client
-	url = git://github.com/scallable/rabbitmq-erlang-client.git
+	url = %BASE%rabbitmq-erlang-client.git
 [submodule "vendor/rabbitmq-codegen"]
 	path = vendor/rabbitmq-codegen
-	url = git://github.com/scallable/rabbitmq-codegen.git
+	url = %BASE%rabbitmq-codegen.git
 [submodule "vendor/rabbitmq-server"]
 	path = vendor/rabbitmq-server
-	url = git://github.com/scallable/rabbitmq-server.git
+	url = %BASE%rabbitmq-server.git
 [submodule "vendor/erabbitmq"]
 	path = vendor/erabbitmq
-	url = git://github.com/scallable/erabbitmq.git
+	url = %BASE%erabbitmq.git
 [submodule "vendor/erlang-ossp-uuid"]
 	path = vendor/erlang-ossp-uuid
-	url = git://github.com/scallable/erlang-ossp-uuid.git
+	url = %BASE%erlang-ossp-uuid.git

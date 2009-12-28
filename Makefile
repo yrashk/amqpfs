@@ -1,3 +1,6 @@
+GIT_BASE_RAW=$(shell git config remote.`git branch|egrep "^\*."|sed s/\*\ //`.url | sed s/amqpfs.git$$//)
+GIT_BASE=$(strip ${GIT_BASE_RAW})
+
 ifeq ($(shell uname),Darwin)
 FUSE_CFLAGS = -D__DARWIN_64_BIT_INO_T=0 -mmacosx-version-min=10.5
 ifeq ($(shell which erl),/opt/local/bin/erl)
@@ -13,6 +16,7 @@ main: submodules
 submodules: init-submodules erabbitmq fuserl fuserldrv erlang-ossp-uuid
 
 init-submodules:
+	@cat gitmodules | awk '{ gsub(/%BASE%/,"$(GIT_BASE)"); print }' > .gitmodules
 	@git submodule init
 	@git submodule update
 
