@@ -1,6 +1,8 @@
-
 ifeq ($(shell uname),Darwin)
 FUSE_CFLAGS = -D__DARWIN_64_BIT_INO_T=0 -mmacosx-version-min=10.5
+ifeq ($(shell which erl),/opt/local/bin/erl)
+FUSE_CFLAGS += -I/opt/local/lib/erlang/usr/include/
+endif
 endif
 
 all: main
@@ -60,3 +62,4 @@ clean:
 
 rabbit:
 	RABBITMQ_MNESIA_BASE=tmp RABBITMQ_LOG_BASE=tmp ./vendor/rabbitmq-server/scripts/rabbitmq-server
+
