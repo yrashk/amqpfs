@@ -21,7 +21,7 @@ Requirements
 * fuse (libfuse-devel on Linux or macfuse on Mac OS X)
 
 On OS X, make sure you install MacFUSE from .dmg package. MacPorts do have macfuse package,
-however, it is missing some crucial elements that target developers.
+however, it lacks some crucial elements that target developers.
 
 Build instructions
 ==================
