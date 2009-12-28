@@ -1,0 +1,2 @@
+Q: How to use your submodules (it is trying to use my github account/git host as a base for .gitmodules)?
+A: Just run make this way: make GIT_BASE=git://github.com/scallable/ (trailing slash is important)
