@@ -20,8 +20,14 @@ Requirements
 * gcc
 * fuse (libfuse-devel on Linux or macfuse on Mac OS X)
 
+On OS X, make sure you install MacFUSE from .dmg package. MacPorts do have macfuse package,
+however, it is missing some crucial elements that target developers.
+
 Build instructions
 ==================
+
+On Mac OS X, one needs to export PKG_CONFIG_PATH like this (so that fuse.pc can be found by pkgconfig):
+$ export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH
 
 $ mkdir ./amqpfs # (for default mount point)
 $ make
