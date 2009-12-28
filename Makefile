@@ -1,4 +1,6 @@
-GIT_BASE_RAW=$(shell git config remote.`git branch|egrep "^\*."|sed s/\*\ //`.url | sed s/amqpfs.git$$//)
+GIT_BRANCH=$(shell git branch|egrep "^\*."|sed s/\*\ //)
+GIT_BRANCH_REMOTE=$(shell git config branch.${GIT_BRANCH}.remote)
+GIT_BASE_RAW=$(shell echo `git config remote.${GIT_BRANCH_REMOTE}.url` | sed s/amqpfs.git$$//)
 GIT_BASE=$(strip ${GIT_BASE_RAW})
 
 ifeq ($(shell uname),Darwin)
