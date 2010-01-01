@@ -23,16 +23,13 @@ init(#amqpfs_provider_state{ channel = Channel }=State) ->
                                              queue = Queue, exchange = <<"amqpfs.announce">>,
                                              routing_key = <<"">>,
                                              nowait = false, arguments = []}),
-    #'basic.consume_ok'{consumer_tag = ConsumerTag} = amqp_channel:subscribe(Channel, #'basic.consume'{
-                                                                               queue = Queue,
-                                                                               consumer_tag = <<"">>,
-                                                                               no_local = false,
-                                                                               no_ack = true,
-                                                                               exclusive = false,
-                                                                               nowait = false}, self()),
-    receive
-        #'basic.consume_ok'{consumer_tag = ConsumerTag} -> ok
-    end,
+    #'basic.consume_ok'{consumer_tag = _ConsumerTag} = amqp_channel:call(Channel, #'basic.consume'{
+                                                                           queue = Queue,
+                                                                           consumer_tag = <<"">>,
+                                                                           no_local = false,
+                                                                           no_ack = true,
+                                                                           exclusive = false,
+                                                                           nowait = false}),
     State1 = State#amqpfs_provider_state { extra = #root_amqpfs_provider_extra{ items = ets:new(root_fs_items, [public, set]) } },
     amqpfs_provider:announce(directory, "/", State1),
     State1.

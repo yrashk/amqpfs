@@ -88,27 +88,21 @@ init ([]) ->
                                                                       queue = ResponseQueue, exchange = <<"amqpfs.response">>,
                                                                       routing_key = amqpfs_util:response_routing_key(),
                                                                       nowait = false, arguments = []}),
-    #'basic.consume_ok'{consumer_tag = ConsumerTag} = amqp_channel:subscribe(AmqpChannel, #'basic.consume'{
-                                                                                                           queue = Queue,
-                                                                                                           consumer_tag = <<"">>,
-                                                                                                           no_local = false,
-                                                                                                           no_ack = true,
-                                                                                                           exclusive = false,
-                                                                                                           nowait = false}, self()),
-    receive
-          #'basic.consume_ok'{consumer_tag = ConsumerTag} -> ok
-    end,
-    #'basic.consume_ok'{consumer_tag = ResponseConsumerTag} = amqp_channel:subscribe(AmqpChannel, #'basic.consume'{
-                                                                                                                   queue = ResponseQueue,
-                                                                                                                   consumer_tag = <<"">>,
-                                                                                                                   no_local = false,
-                                                                                                                   no_ack = true,
-                                                                                                                   exclusive = false,
-                                                                                                                   nowait = false}, self()),
-    receive
-          #'basic.consume_ok'{consumer_tag = ResponseConsumerTag} -> ok
-    end,
+    #'basic.consume_ok'{consumer_tag = ConsumerTag} = amqp_channel:call(AmqpChannel, #'basic.consume'{
+                                                                          queue = Queue,
+                                                                          consumer_tag = <<"">>,
+                                                                          no_local = false,
+                                                                          no_ack = true,
+                                                                          exclusive = false,
+                                                                          nowait = false}),
 
+    #'basic.consume_ok'{consumer_tag = ResponseConsumerTag} = amqp_channel:call(AmqpChannel, #'basic.consume'{
+                                                                                  queue = ResponseQueue,
+                                                                                  consumer_tag = <<"">>,
+                                                                                  no_local = false,
+                                                                                  no_ack = true,
+                                                                                  exclusive = false,
+                                                                                  nowait = false}),
     State = #amqpfs{ inodes = ets:new(inodes, [public, ordered_set]),
                      names = ets:new(names, [public, set]),
                      announcements = ets:new(announcements, [public, bag]),

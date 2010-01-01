@@ -195,17 +195,13 @@ setup_listener(Name, #amqpfs_provider_state{channel = Channel, user_id = UserId}
                                              queue = Queue, exchange = <<"amqpfs.provider">>,
                                              routing_key = UserId,
                                              nowait = false, arguments = []}),
-    #'basic.consume_ok'{consumer_tag = ConsumerTag} = amqp_channel:subscribe(Channel, #'basic.consume'{
-                                                                                                       queue = Queue,
-                                                                                                       consumer_tag = <<"">>,
-                                                                                                       no_local = false,
-                                                                                                       no_ack = true,
-                                                                                                       exclusive = false,
-                                                                                                       nowait = false}, self()),
-    receive
-          #'basic.consume_ok'{consumer_tag = ConsumerTag} -> ok
-    end.
-
+    #'basic.consume_ok'{consumer_tag = _ConsumerTag} = amqp_channel:call(Channel, #'basic.consume'{
+                                                                           queue = Queue,
+                                                                           consumer_tag = <<"">>,
+                                                                           no_local = false,
+                                                                           no_ack = true,
+                                                                           exclusive = false,
+                                                                           nowait = false}).
 
 %%%
 
