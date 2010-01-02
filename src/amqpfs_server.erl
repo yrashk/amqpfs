@@ -66,7 +66,7 @@ start_link (LinkedIn, Dir, MountOpts) ->
 
 init ([]) ->
     {ok, AmqpConn} = erabbitmq_connections:start(),
-    {ok, AmqpChannel} = erabbitmq_channels:open(AmqpConn),
+    {ok, AmqpChannel} = erabbitmq_channels:open(),
     amqpfs_util:setup(AmqpChannel),
     Queue = amqpfs_util:announce_queue_name(),
     ResponseQueue = amqpfs_util:response_queue_name(),
