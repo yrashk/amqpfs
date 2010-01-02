@@ -142,13 +142,13 @@ terminate(_Reason, _State) ->
 
 send_response(ReplyTo, MessageId, ContentType, Headers, Content, #amqpfs_provider_state{channel = Channel, app_id = AppId, user_id = UserId}) ->
     amqp_channel:call(Channel, #'basic.publish'{exchange = <<"amqpfs.response">>, routing_key = ReplyTo},
-                      {amqp_msg, #'P_basic'{correlation_id = MessageId,
-                                            content_type = ContentType,
-                                            app_id = AppId,
-                                            user_id = UserId,
-                                            headers = Headers
-                                            },
-                       Content}).
+                      #amqp_msg{ props =  #'P_basic'{correlation_id = MessageId,
+                                                     content_type = ContentType,
+                                                     app_id = AppId,
+                                                     user_id = UserId,
+                                                     headers = Headers
+                                                    },
+                                 payload = Content}).
 
 ttl(Path, State) ->
     case call_module(ttl, [tokenize_path(Path), State], State) of
@@ -162,7 +162,7 @@ ttl(Path, State) ->
 
 announce(directory, Name, #amqpfs_provider_state{ channel = Channel, app_id = AppId, user_id = UserId } = State) ->
     setup_listener(Name, State),
-    amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs.announce">>}, {amqp_msg, #'P_basic'{content_type = ?CONTENT_TYPE_BERT, app_id = AppId, user_id = UserId}, term_to_binary({announce, directory, {Name,on_demand}})}).
+    amqp_channel:call(Channel, #'basic.publish'{exchange= <<"amqpfs.announce">>}, #amqp_msg{ props = #'P_basic'{content_type = ?CONTENT_TYPE_BERT, app_id = AppId, user_id = UserId}, payload = term_to_binary({announce, directory, {Name,on_demand}})}).
 
 %%%% 
 

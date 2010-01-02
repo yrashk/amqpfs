@@ -996,7 +996,7 @@ heartbeat(#amqpfs{ amqp_channel = Channel, providers = Providers, announcements 
         Matches when is_list(Matches) ->
             lists:map(fun (UserId) ->
                               amqp_channel:call(Channel, #'basic.publish'{exchange = <<"amqpfs.provider">>, routing_key = UserId}, 
-                              {amqp_msg, #'P_basic'{reply_to = amqpfs_util:response_routing_key(), headers = env_headers(State) }, term_to_binary(ping)})
+                              #amqp_msg{ props = #'P_basic'{reply_to = amqpfs_util:response_routing_key(), headers = env_headers(State) }, payload = term_to_binary(ping)})
                       end, Matches)
     end,
     timer:sleep(?HEARTBEAT_INTERVAL),
@@ -1101,7 +1101,7 @@ remote(Path, Command, Ctx, #amqpfs{response_cache = Tab}=State) ->
 remote_impl(Path, Command, Ctx, #amqpfs{amqp_channel = Channel, response_cache = Tab}=State) ->
     Route = register_response_route(Path, Command, State),
     amqp_channel:call(Channel, #'basic.publish'{exchange = <<"amqpfs">>, routing_key = amqpfs_util:path_to_routing_key(Path)}, 
-                      {amqp_msg, #'P_basic'{message_id = Route, reply_to = amqpfs_util:response_routing_key(), headers = env_headers(State) ++ ctx_headers(Ctx) }, term_to_binary(Command)}),
+                      #amqp_msg{ props = #'P_basic'{message_id = Route, reply_to = amqpfs_util:response_routing_key(), headers = env_headers(State) ++ ctx_headers(Ctx) }, payload = term_to_binary(Command)}),
     Response = 
         receive 
             {response, Data, 0} ->
