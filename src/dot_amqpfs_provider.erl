@@ -18,7 +18,7 @@ init(State) ->
             RequestedState
     end,
     amqpfs_provider:announce(directory, "/.amqpfs", State),
-    State#amqpfs_provider_state{ extra = AmqpfsState }.
+    AmqpfsState.
 
 list_dir([".amqpfs"], _State) ->
     [{"version", {file, on_demand}},{"providers",{directory, on_demand}},{"announcements",{file, on_demand}}];

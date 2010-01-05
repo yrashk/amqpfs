@@ -30,7 +30,7 @@ init(#amqpfs_provider_state{ args = Args } = State) ->
       attrs = ets:new(ramfs_attrs, [public, set])
      },
     amqpfs_provider:announce(directory, proplists:get_value(dir, Args, "/ramfs"), State),
-    State#amqpfs_provider_state{ extra = RamFS }.
+    RamFS.
 
 list_dir(Path, #amqpfs_provider_state{ extra = RamFS }) ->
     #ramfs{ files = Files } = RamFS,

@@ -32,7 +32,13 @@ start(Module, Args) ->
 init([Module, Args]) ->
     State0 = #amqpfs_provider_state{ module = Module, args = Args},
     State1 = setup(State0),
-    State2 = call_module(init, [State1], State1),
+    State2 = 
+        case call_module(init, [State1], State1) of
+            #amqpfs_provider_state{}=S ->
+                S;
+            Other ->
+                State1#amqpfs_provider_state{ extra = Other }
+        end,
     {ok, State2}.
 
 

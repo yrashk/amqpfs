@@ -30,9 +30,9 @@ init(#amqpfs_provider_state{ channel = Channel }=State) ->
                                                                            no_ack = true,
                                                                            exclusive = false,
                                                                            nowait = false}),
-    State1 = State#amqpfs_provider_state { extra = #root_amqpfs_provider_extra{ items = ets:new(root_fs_items, [public, set]) } },
-    amqpfs_provider:announce(directory, "/", State1),
-    State1.
+    amqpfs_provider:announce(directory, "/", State),
+    #root_amqpfs_provider_extra{ items = ets:new(root_fs_items, [public, set]) }.
+
 
 list_dir([], #amqpfs_provider_state{ extra = Extra }) ->
     Items = Extra#root_amqpfs_provider_extra.items,
